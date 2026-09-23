@@ -14,20 +14,35 @@ export default function MyPagesPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const refresh = useCallback(async () => setPages(await listPages()), []);
+  const refresh = useCallback(async () => {
+    try {
+      setPages(await listPages());
+    } catch {
+      setPages([]);
+      toast.error("Couldn't load your saved pages.");
+    }
+  }, []);
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
   async function submitRename(id: string) {
-    if (draft.trim()) await renamePage(id, draft.trim());
-    setRenaming(null);
-    await refresh();
+    try {
+      if (draft.trim()) await renamePage(id, draft.trim());
+      setRenaming(null);
+      await refresh();
+    } catch {
+      toast.error("Couldn't rename the page.");
+    }
   }
 
   async function exportOne(id: string) {
-    const page = await getPage(id);
-    if (page) downloadBlob(new Blob([exportPageJson(page)], { type: "application/json" }), `${safeFilename(page.title)}.json`);
+    try {
+      const page = await getPage(id);
+      if (page) downloadBlob(new Blob([exportPageJson(page)], { type: "application/json" }), `${safeFilename(page.title)}.json`);
+    } catch {
+      toast.error("Couldn't export the page.");
+    }
   }
 
   async function importFile(file: File) {
@@ -37,6 +52,25 @@ export default function MyPagesPage() {
       await refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Import failed.");
+    }
+  }
+
+  async function handleDuplicate(id: string) {
+    try {
+      await duplicatePage(id);
+      await refresh();
+    } catch {
+      toast.error("Couldn't duplicate the page.");
+    }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      await deletePage(id);
+      setConfirmDelete(null);
+      await refresh();
+    } catch {
+      toast.error("Couldn't delete the page.");
     }
   }
 
@@ -90,12 +124,15 @@ export default function MyPagesPage() {
               <p className="mt-1 text-xs text-ink-muted">{p.tabCount} tabs · Updated {formatDate(p.updatedAt)}</p>
               <div className="mt-auto flex flex-wrap gap-1 pt-4">
                 <Button variant="ghost" onClick={() => { setRenaming(p.id); setDraft(p.title); }}>Rename</Button>
-                <Button variant="ghost" onClick={async () => { await duplicatePage(p.id); await refresh(); }}>Duplicate</Button>
-                <Button variant="ghost" onClick={() => exportOne(p.id)}>Export</Button>
+                <Button variant="ghost" onClick={() => void handleDuplicate(p.id)}>Duplicate</Button>
+                <Button variant="ghost" onClick={() => void exportOne(p.id)}>Export</Button>
                 {confirmDelete === p.id ? (
-                  <Button variant="danger" onClick={async () => { await deletePage(p.id); setConfirmDelete(null); await refresh(); }}>
-                    Confirm delete
-                  </Button>
+                  <>
+                    <Button variant="danger" onClick={() => void handleDelete(p.id)}>
+                      Confirm delete
+                    </Button>
+                    <Button variant="ghost" onClick={() => setConfirmDelete(null)}>Cancel</Button>
+                  </>
                 ) : (
                   <Button variant="ghost" onClick={() => setConfirmDelete(p.id)}>Delete</Button>
                 )}
