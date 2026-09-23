@@ -56,7 +56,7 @@ IndexedDB: saved pages (page JSON, source text, images, embeds, undo history)
 ```
 backend/
   app/
-    main.py                 FastAPI app, CORS, /health
+    main.py                 FastAPI app, CORS, /api/health
     config.py               settings (model name, limits, allowed origin)
     routers/
       extract.py            POST /api/extract
@@ -171,6 +171,7 @@ type ExtractResult = {
             canvas_tag?: string }[];                 // Canvas images: original <img> HTML
   embeds: { ref: string; html: string }[];       // original <iframe> HTML
   approx_tokens: number;
+  token_limit: number;
 };
 ```
 
@@ -190,7 +191,7 @@ type ExtractResult = {
 ## 7. AI generation
 
 **`POST /api/generate`**: `{ text, images: [{ref, location, thumb_b64}], instructions?, include_revision, title? }` → `{ page: Page }`.
-**`POST /api/regenerate-tab`**: `{ text, images, page_outline: {intro, tab_titles}, tab: Tab, instruction }` → `{ tab: Tab }`. The page's source text is stored with it in IndexedDB so regeneration stays grounded in the source.
+**`POST /api/regenerate-tab`**: `{ text, images, outline: {intro, tab_titles}, tab: Tab, instruction }` → `{ tab: Tab, notes: Note[] }`. The page's source text is stored with it in IndexedDB so regeneration stays grounded in the source.
 
 - `google-genai`, model from config (default `gemini-3.6-flash`), `response_mime_type="application/json"`, `response_schema` = Page or Tab, with thinking set via `thinking_level` (as in Rx-H5P-Generator).
 - Image thumbnails are sent as inline image parts, each labelled with its ref.
@@ -210,7 +211,7 @@ type ExtractResult = {
 3. **My pages:** cards with title and updated date, plus open / rename / duplicate / delete / export (`.json` including images as base64) / import.
 
 - **Header:** app name (text only, no university logo, per the brand guide's approval requirement), nav (Create, My pages), and an **Insert API Key** button (a modal; the key is saved in localStorage).
-- **Cold start:** on load, the app pings `/health`. While it waits, a banner shows "Waking up the server (up to a minute)…".
+- **Cold start:** on load, the app pings `/api/health`. While it waits, a banner shows "Waking up the server (up to a minute)…".
 
 ## 9. App UI visual design
 
@@ -238,7 +239,7 @@ The server logs errors only. Keys and document contents are never logged.
 
 ## 11. Hosting
 
-- **Backend:** Render free web service from `backend/Dockerfile`. `ALLOWED_ORIGIN` is set to the Vercel URL. `/health` endpoint.
+- **Backend:** Render free web service from `backend/Dockerfile`. `ALLOWED_ORIGINS` is set to the Vercel URL. `/api/health` endpoint.
 - **Frontend:** Vercel. `VITE_API_BASE_URL` points at Render.
 - **Local dev:** `setup.bat` / `start.bat` as in Rx-H5P-Generator.
 - **Repository:** a new public GitHub repository (required for PyMuPDF's AGPL licence). The README is written for non-technical colleagues.
