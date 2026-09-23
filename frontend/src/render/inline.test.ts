@@ -16,6 +16,11 @@ describe("renderInline", () => {
       'See <a href="https://www.tga.gov.au/a?b=1&amp;c=2" target="_blank" rel="noopener">TGA</a>',
     );
   });
+  it("renders a URL with a balanced parenthesis pair (e.g. a DOI) in full", () => {
+    expect(renderInline("See [the study](https://doi.org/10.1016/S0140-6736(20)30183-5).")).toBe(
+      'See <a href="https://doi.org/10.1016/S0140-6736(20)30183-5" target="_blank" rel="noopener">the study</a>.',
+    );
+  });
   it("does not link other schemes", () => {
     expect(renderInline("[x](javascript:alert(1))")).toBe("[x](javascript:alert(1))");
   });

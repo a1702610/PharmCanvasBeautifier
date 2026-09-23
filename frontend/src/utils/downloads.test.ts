@@ -13,6 +13,14 @@ describe("zipEntries", () => {
       { name: "IMG-01.jpg", base64: "AAA" },
     ]);
   });
+
+  it("skips a matching image whose ref isn't IMG-nn", () => {
+    const images = [
+      { ref: "IMG-01", source: "a", location: "", mime: "image/jpeg", data_b64: "AAA" },
+      { ref: "EMBED-01", source: "a", location: "", mime: "image/jpeg", data_b64: "CCC" },
+    ];
+    expect(zipEntries(images, ["IMG-01", "EMBED-01"])).toEqual([{ name: "IMG-01.jpg", base64: "AAA" }]);
+  });
 });
 
 describe("safeFilename", () => {

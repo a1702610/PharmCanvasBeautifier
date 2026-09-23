@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import type { SourceStatus } from "../types/api";
 import type { Page, Tab } from "../types/page";
 import type { SavedPage } from "./db";
-import { HISTORY_LIMIT, imagesForAI, replaceTab, undoTab, usedImageRefs } from "./pageOps";
+import { HISTORY_LIMIT, imagesForAI, replaceTab, sourceNotes, undoTab, usedImageRefs } from "./pageOps";
 
 const tab = (id: string, text: string): Tab => ({ id, title: id, blocks: [{ type: "paragraph", text }] });
 const page: Page = {
@@ -65,5 +66,23 @@ describe("imagesForAI", () => {
         { ref: "IMG-02", source: "b", location: "", canvas_tag: "<img>" },
       ]),
     ).toEqual([{ ref: "IMG-01", location: "slide 1", thumb_b64: "T" }]);
+  });
+});
+
+describe("sourceNotes", () => {
+  it("flags each warning from an ok source and the error from a failed source", () => {
+    const statuses: SourceStatus[] = [
+      { name: "Week 3.pptx", kind: "pptx", ok: true, warnings: ["Page 2 looks scanned"] },
+      { name: "notes.docx", kind: "docx", ok: false, error: "This file couldn't be read.", warnings: [] },
+      { name: "Week 4.pdf", kind: "pdf", ok: true, warnings: [] },
+    ];
+    expect(sourceNotes(statuses)).toEqual([
+      { kind: "flag", text: "Week 3.pptx: Page 2 looks scanned" },
+      { kind: "flag", text: "notes.docx: This file couldn't be read." },
+    ]);
+  });
+
+  it("returns no notes when there are no warnings or errors", () => {
+    expect(sourceNotes([{ name: "a.pdf", kind: "pdf", ok: true, warnings: [] }])).toEqual([]);
   });
 });

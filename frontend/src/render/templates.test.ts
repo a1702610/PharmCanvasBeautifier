@@ -151,6 +151,14 @@ describe("block templates", () => {
     expect(render({ type: "link", lead_in: "Guidance", url: "https://x.org", link_text: "TGA" })).toContain(">Guidance: <a ");
   });
 
+  it("link callout with a non-http(s) url renders as plain escaped text, no <a>", () => {
+    const html = render({ type: "link", lead_in: "See", url: "javascript:alert(1)", link_text: "<script>bad</script>" });
+    expect(html).toBe(
+      '<div style="border-left: 4px solid #2563eb; background-color: #eff6ff; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;">See: &lt;script&gt;bad&lt;/script&gt;</div>',
+    );
+    expect(html).not.toContain("<a ");
+  });
+
   it("figure placeholder and caption", () => {
     expect(render({ type: "figure", ref: "IMG-01", alt: "Opioid ladder", caption: "AMH Online" })).toBe(
       [

@@ -8,10 +8,10 @@ import { GenerateProgress, type Stage } from "../components/create/GenerateProgr
 import { PasteCanvasModal } from "../components/create/PasteCanvasModal";
 import { SourceList } from "../components/create/SourceList";
 import { Button } from "../components/ui/Button";
-import { checkFile, MAX_SOURCES } from "../config";
+import { checkFile, checkPaste, MAX_SOURCES } from "../config";
 import { useApiKey } from "../hooks/useApiKey";
 import { newSavedPage, savePage } from "../storage/db";
-import { imagesForAI } from "../storage/pageOps";
+import { imagesForAI, sourceNotes } from "../storage/pageOps";
 import type { ExtractResult, SourceInput, SourceStatus } from "../types/api";
 
 export default function CreatePage() {
@@ -44,6 +44,11 @@ export default function CreatePage() {
   function addCanvas(html: string) {
     if (sources.length >= MAX_SOURCES) {
       toast.error(`You can add up to ${MAX_SOURCES} sources per page.`);
+      return;
+    }
+    const pasteError = checkPaste(html);
+    if (pasteError) {
+      toast.error(pasteError);
       return;
     }
     const n = sources.filter((s) => s.kind === "canvas").length + 1;
@@ -93,7 +98,11 @@ export default function CreatePage() {
         title,
       });
       setStage("building");
-      const saved = await savePage(newSavedPage({ page, sourceText: result.text, images: result.images, embeds: result.embeds }));
+      const notes = sourceNotes(result.sources);
+      const pageWithNotes = notes.length ? { ...page, notes: [...page.notes, ...notes] } : page;
+      const saved = await savePage(
+        newSavedPage({ page: pageWithNotes, sourceText: result.text, images: result.images, embeds: result.embeds }),
+      );
       navigate(`/pages/${saved.id}`);
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Something went wrong. Please try again."));

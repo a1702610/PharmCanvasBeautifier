@@ -1,6 +1,7 @@
 import type { ImageInfo } from "../types/api";
 
 const EXT: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" };
+const IMG_REF_RE = /^IMG-\d+$/;
 
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
@@ -16,6 +17,7 @@ export function downloadBlob(blob: Blob, filename: string): void {
 export function zipEntries(images: ImageInfo[], refs: string[]): { name: string; base64: string }[] {
   const entries = [];
   for (const ref of refs) {
+    if (!IMG_REF_RE.test(ref)) continue;
     const image = images.find((i) => i.ref === ref);
     if (!image?.data_b64) continue;
     entries.push({ name: `${ref}.${EXT[image.mime ?? ""] ?? "png"}`, base64: image.data_b64 });

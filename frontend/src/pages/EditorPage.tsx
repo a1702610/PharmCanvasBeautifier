@@ -95,7 +95,8 @@ export default function EditorPage() {
         tab: regenTarget,
         instruction,
       });
-      await persist(replaceTab(current, regenTarget.id, result.tab, result.notes));
+      const latest = (await getPage(current.id)) ?? current;
+      await persist(replaceTab(latest, regenTarget.id, result.tab, result.notes));
       setRegenTarget(null);
       toast.success("Tab regenerated");
     } catch (err) {
@@ -129,7 +130,7 @@ export default function EditorPage() {
             historyCounts={historyCounts}
             onSelect={(i) => { setActiveIndex(i); setView("preview"); }}
             onRegenerate={setRegenTarget}
-            onUndo={(tab) => persist(undoTab(current, tab.id))}
+            onUndo={(tab) => persist(undoTab(current, tab.id)).catch(() => toast.error("Couldn't undo."))}
           />
           <NotesPanel notes={current.page.notes} />
         </div>

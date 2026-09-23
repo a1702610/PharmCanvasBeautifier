@@ -21,7 +21,10 @@ export function escapeText(s: string): string {
 
 export const escapeAttr = escapeText;
 
-const LINK_RE = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+// A URL made of "plain" characters or a single balanced (...) group, so the closing ")"
+// of the markdown link isn't swallowed by a balanced pair inside the URL itself
+// (e.g. a DOI like https://doi.org/10.1016/S0140-6736(20)30183-5).
+const LINK_RE = /\[([^\]]+)\]\((https?:\/\/(?:[^\s()]|\([^\s()]*\))+)\)/g;
 const BOLD_RE = /\*\*(.+?)\*\*/g;
 const ITALIC_RE = /(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g;
 

@@ -1,4 +1,4 @@
-import type { ImageForAI, ImageInfo } from "../types/api";
+import type { ImageForAI, ImageInfo, SourceStatus } from "../types/api";
 import type { Note, Page, Tab } from "../types/page";
 import type { SavedPage } from "./db";
 
@@ -50,4 +50,17 @@ export function imagesForAI(images: ImageInfo[]): ImageForAI[] {
   return images
     .filter((i) => i.thumb_b64)
     .map((i) => ({ ref: i.ref, location: i.location, thumb_b64: i.thumb_b64! }));
+}
+
+/** Turn per-source extraction warnings/errors into page notes, so they aren't lost after navigation. */
+export function sourceNotes(statuses: SourceStatus[]): Note[] {
+  const notes: Note[] = [];
+  for (const s of statuses) {
+    if (s.ok) {
+      for (const warning of s.warnings) notes.push({ kind: "flag", text: `${s.name}: ${warning}` });
+    } else if (s.error) {
+      notes.push({ kind: "flag", text: `${s.name}: ${s.error}` });
+    }
+  }
+  return notes;
 }

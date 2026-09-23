@@ -157,8 +157,10 @@ export function blockLines(block: Block, ctx: RenderContext): string[] {
     case "link": {
       const lead = block.lead_in.trim();
       const prefix = lead ? `${renderInline(lead)}${lead.endsWith(":") ? " " : ": "}` : "";
-      const anchor = `<a href="${escapeAttr(block.url)}" target="_blank" rel="noopener">${renderInline(block.link_text)}</a>`;
-      return [`<div style="${callout("#2563eb", "#eff6ff")}">${prefix}${anchor}</div>`];
+      const body = /^https?:\/\//.test(block.url)
+        ? `<a href="${escapeAttr(block.url)}" target="_blank" rel="noopener">${renderInline(block.link_text)}</a>`
+        : renderInline(block.link_text);
+      return [`<div style="${callout("#2563eb", "#eff6ff")}">${prefix}${body}</div>`];
     }
     case "figure":
       return figureLines(block, ctx);

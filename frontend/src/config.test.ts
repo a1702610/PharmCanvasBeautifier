@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkFile, MAX_SOURCES } from "./config";
+import { checkFile, checkPaste, MAX_PASTE_BYTES, MAX_SOURCES } from "./config";
 
 const file = (name: string, size = 10) => new File([new Uint8Array(size)], name);
 
@@ -17,5 +17,15 @@ describe("checkFile", () => {
   });
   it("rejects when the source limit is reached", () => {
     expect(checkFile(file("a.pdf"), MAX_SOURCES)).toMatch(/up to 5 sources/);
+  });
+});
+
+describe("checkPaste", () => {
+  it("accepts pasted HTML under the limit", () => {
+    expect(checkPaste("<div>hello</div>")).toBeNull();
+  });
+  it("rejects pasted HTML over 1 MB", () => {
+    const huge = "a".repeat(MAX_PASTE_BYTES + 1);
+    expect(checkPaste(huge)).toMatch(/over 1 MB/);
   });
 });
