@@ -56,6 +56,15 @@ def test_fails_after_two_invalid_responses():
         run(FakeModels(["{oops", '{"wrong": 1}']))
     assert err.value.status_code == 502
     assert err.value.message == gemini.FAILED_MESSAGE
+    assert err.value.__cause__ is not None
+
+
+def test_fails_after_two_generic_errors_keeps_cause():
+    second = ApiError(500, "boom")
+    with pytest.raises(gemini.GeminiError) as err:
+        run(FakeModels([ApiError(500, "boom"), second]))
+    assert err.value.status_code == 502
+    assert err.value.__cause__ is second
 
 
 def test_invalid_key_is_not_retried():

@@ -72,6 +72,7 @@ async def generate_structured(
         thinking_config=types.ThinkingConfig(thinking_level="low"),
     )
     contents = build_contents(prompt, images)
+    last_error: Exception | None = None
     for attempt in range(1, ATTEMPTS + 1):
         try:
             response = await client.aio.models.generate_content(
@@ -83,10 +84,15 @@ async def generate_structured(
                 raise GeminiError(KEY_MESSAGE, 401) from exc
             if kind == "rate":
                 raise GeminiError(RATE_MESSAGE, 429) from exc
-            logger.warning("Gemini call failed (attempt %d): %s", attempt, type(exc).__name__)
+            last_error = exc
+            logger.warning(
+                "Gemini call failed (attempt %d): %s: %s",
+                attempt, type(exc).__name__, str(exc)[:300],
+            )
             continue
         try:
             return schema.model_validate_json(response.text or "")
-        except (ValidationError, ValueError):
+        except (ValidationError, ValueError) as exc:
+            last_error = exc
             logger.warning("Gemini returned invalid JSON (attempt %d)", attempt)
-    raise GeminiError(FAILED_MESSAGE, 502)
+    raise GeminiError(FAILED_MESSAGE, 502) from last_error
