@@ -1,5 +1,6 @@
-import { useEffect, useRef, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, type MouseEvent } from "react";
 import "../../render/preview.css";
+import { sanitizePreviewHtml } from "../../render/sanitize";
 
 interface Props {
   html: string;
@@ -9,11 +10,12 @@ interface Props {
 
 export function CanvasPreview({ html, activeIndex, onSelect }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const safe = useMemo(() => sanitizePreviewHtml(html), [html]);
 
   useEffect(() => {
     const groups = ref.current?.querySelectorAll<HTMLElement>(".dp-panel-group") ?? [];
     groups.forEach((group, i) => group.classList.toggle("is-active", i === activeIndex));
-  }, [html, activeIndex]);
+  }, [safe, activeIndex]);
 
   function handleClick(e: MouseEvent<HTMLDivElement>) {
     const heading = (e.target as HTMLElement).closest(".dp-panel-heading");
@@ -23,5 +25,5 @@ export function CanvasPreview({ html, activeIndex, onSelect }: Props) {
     if (index >= 0) onSelect(index);
   }
 
-  return <div ref={ref} className="canvas-preview" onClick={handleClick} dangerouslySetInnerHTML={{ __html: html }} />;
+  return <div ref={ref} className="canvas-preview" onClick={handleClick} dangerouslySetInnerHTML={{ __html: safe }} />;
 }

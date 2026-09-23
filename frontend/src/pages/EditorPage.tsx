@@ -29,7 +29,7 @@ export default function EditorPage() {
   const [tipOpen, setTipOpen] = useState(false);
 
   useEffect(() => {
-    if (id) getPage(id).then((p) => setSaved(p ?? null));
+    if (id) getPage(id).then((p) => setSaved(p ?? null)).catch(() => setSaved(null));
   }, [id]);
 
   const html = useMemo(
