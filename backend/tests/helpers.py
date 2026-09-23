@@ -36,3 +36,37 @@ def make_docx(png: bytes) -> bytes:
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue()
+
+
+def make_pptx(png: bytes, logo: bytes | None = None, slides: int = 1) -> bytes:
+    from pptx import Presentation
+    from pptx.util import Inches
+
+    prs = Presentation()
+    for n in range(slides):
+        slide = prs.slides.add_slide(prs.slide_layouts[1])
+        if logo is not None:
+            slide.shapes.add_picture(io.BytesIO(logo), Inches(8), Inches(0.2), Inches(1))
+        if n > 0:
+            slide.shapes.title.text = f"Slide {n + 1}"
+            continue
+        slide.shapes.title.text = "Opioids"
+        body = slide.placeholders[1].text_frame
+        body.text = "Start low"
+        sub = body.add_paragraph()
+        sub.text = "Go slow"
+        sub.level = 1
+        linked = body.add_paragraph()
+        run = linked.add_run()
+        run.text = "TGA guidance"
+        run.hyperlink.address = "https://www.tga.gov.au"
+        slide.notes_slide.notes_text_frame.text = "Explain tolerance"
+        slide.shapes.add_picture(io.BytesIO(png), Inches(1), Inches(1))
+        table = slide.shapes.add_table(2, 2, Inches(1), Inches(5), Inches(4), Inches(1)).table
+        table.cell(0, 0).text = "Class"
+        table.cell(0, 1).text = "Agents"
+        table.cell(1, 0).text = "Opioid"
+        table.cell(1, 1).text = "morphine"
+    buf = io.BytesIO()
+    prs.save(buf)
+    return buf.getvalue()
