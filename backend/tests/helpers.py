@@ -70,3 +70,16 @@ def make_pptx(png: bytes, logo: bytes | None = None, slides: int = 1) -> bytes:
     buf = io.BytesIO()
     prs.save(buf)
     return buf.getvalue()
+
+
+def make_pdf(png1: bytes, png2: bytes) -> bytes:
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Paracetamol in chronic pain")
+    page.insert_image(pymupdf.Rect(72, 100, 272, 300), stream=png1)
+    page.insert_link({"kind": pymupdf.LINK_URI, "from": pymupdf.Rect(72, 320, 272, 340), "uri": "https://example.org/report"})
+    page2 = doc.new_page()
+    page2.insert_image(pymupdf.Rect(72, 72, 372, 372), stream=png2)
+    return doc.tobytes()
