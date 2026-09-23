@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: pharm-canvas-backend
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: GEMINI_MODEL
+        value: gemini-3.6-flash
+      - key: ALLOWED_ORIGINS
+        sync: false
