@@ -33,7 +33,7 @@ No HTML and no other markdown (no `#`, no bullet characters, no tables inside te
 
 # 4. Block types — when to use each
 
-Set every field that the block type doesn't use to null.
+Omit fields that the block type doesn't use.
 
 - **heading** (`text`): a subheading within a tab.
 - **paragraph** (`text`): prose, 2–4 sentences.

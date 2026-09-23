@@ -12,8 +12,12 @@ from app.ai.schema import (
     Revision, Tab, Table, WireBlock, WireChild, WirePage, WireTab,
 )
 
-URL_RE = re.compile(r"https?://[^\s<>\"'\])]+")
-MD_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
+# A URL segment made of "plain" characters or a single balanced (...) group, so a
+# trailing ")" that closes an outer markdown link or sentence isn't swallowed, while a
+# balanced pair inside the URL itself (e.g. a DOI like ...(20)30183-5) is kept.
+_URL_BODY = r'(?:[^\s<>"\'\[\]()]|\([^\s<>"\'()]*\))+'
+URL_RE = re.compile(r"https?://" + _URL_BODY)
+MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((" + _URL_BODY + r")\)")
 IMG_REF_RE = re.compile(r"\[(IMG-\d+)")
 EMBED_REF_RE = re.compile(r"\[(EMBED-\d+)\]")
 
@@ -69,6 +73,17 @@ class _Finalizer:
         cells = [self.text(c) for c in row][:width]
         return cells + [""] * (width - len(cells))
 
+    def _col_widths(self, col_widths: list[float] | None, n: int) -> list[float] | None:
+        if not col_widths or len(col_widths) != n:
+            return None
+        total = sum(col_widths)
+        if total <= 1.5:
+            col_widths = [w * 100 for w in col_widths]
+            total *= 100
+        if not 80 <= total <= 120:
+            return None
+        return col_widths
+
     def _table(self, b: WireBlock) -> Table | None:
         headers = [self.text(h) for h in b.headers or []]
         if not any(headers):
@@ -76,7 +91,7 @@ class _Finalizer:
         rows = [r for r in (self._row(r, len(headers)) for r in b.rows or []) if any(r)]
         if not rows:
             return None
-        widths = b.col_widths if b.col_widths and len(b.col_widths) == len(headers) else None
+        widths = self._col_widths(b.col_widths, len(headers))
         return Table(headers=headers, col_widths=widths, rows=rows)
 
     def _contrast(self, b: WireBlock) -> ContrastTable | None:

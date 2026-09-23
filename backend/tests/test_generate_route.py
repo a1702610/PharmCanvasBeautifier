@@ -98,3 +98,10 @@ def test_regenerate_tab_empty_result_is_502(calls):
     body = {"text": TEXT, "outline": {}, "tab": {"id": "t1", "title": "X", "blocks": [P]}, "instruction": "Shorter"}
     response = client.post("/api/regenerate-tab", json=body, headers=HEADERS)
     assert response.status_code == 502
+
+
+def test_generate_empty_page_is_502(calls):
+    calls.outcome["value"] = WirePage.model_validate({"title": "X", "intro": [], "tabs": []})
+    response = client.post("/api/generate", json={"text": TEXT}, headers=HEADERS)
+    assert response.status_code == 502
+    assert response.json()["detail"] == "The AI returned an empty page. Please try again."

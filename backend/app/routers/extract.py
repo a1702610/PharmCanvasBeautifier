@@ -23,8 +23,8 @@ READ_ERROR = "This file couldn't be read. It may be corrupt or password-protecte
 async def _run(name: str, kind: str, fn, payload) -> tuple[SourceStatus, SourceExtract | None]:
     try:
         extract = await run_in_threadpool(fn, payload, name)
-    except Exception:
-        logger.exception("Extraction failed (%s)", kind)
+    except Exception as exc:
+        logger.warning("Extraction failed (%s): %s", kind, type(exc).__name__)
         return SourceStatus(name=name, kind=kind, ok=False, error=READ_ERROR), None
     return SourceStatus(name=name, kind=kind, ok=True, warnings=list(extract.warnings)), extract
 

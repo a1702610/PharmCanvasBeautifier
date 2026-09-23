@@ -81,6 +81,8 @@ async def generate(req: GenerateRequest, x_gemini_key: str | None = Header(defau
     except gemini.GeminiError as exc:
         raise HTTPException(exc.status_code, exc.message)
     page = finalize_page(wire, SourceContext.from_text(req.text), include_revision=req.include_revision)
+    if not page.tabs:
+        raise HTTPException(502, "The AI returned an empty page. Please try again.")
     if req.title.strip():
         page.title = req.title.strip()
     return GenerateResponse(page=page)

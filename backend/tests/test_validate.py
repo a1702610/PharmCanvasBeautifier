@@ -19,6 +19,33 @@ def wire(tabs, **extra):
     return WirePage.model_validate({"title": "Chronic pain", "intro": ["Intro."], "tabs": tabs, **extra})
 
 
+DOI_SOURCE = (
+    "=== SOURCE 1: a.pptx ===\n\n--- Slide 1 ---\n"
+    "See https://doi.org/10.1016/S0140-6736(20)30183-5 for detail.\n[IMG-01: slide 1]\n[EMBED-01]"
+)
+DOI_CTX = SourceContext.from_text(DOI_SOURCE)
+DOI_URL = "https://doi.org/10.1016/S0140-6736(20)30183-5"
+
+
+def test_source_context_collects_url_with_balanced_parens():
+    assert DOI_CTX.urls == {DOI_URL}
+
+
+def test_link_block_with_balanced_paren_url_is_kept():
+    blocks = [{"type": "link", "lead_in": "See", "url": DOI_URL, "link_text": "the study"}]
+    page = finalize_page(wire([tab("A", *blocks), tab("B", P), tab("C", P)]), DOI_CTX, include_revision=False)
+    assert page.tabs[0].blocks == [Link(lead_in="See", url=DOI_URL, link_text="the study")]
+    assert page.notes == []
+
+
+def test_inline_md_link_with_balanced_paren_url_is_kept():
+    w = wire([tab("A", P), tab("B", P), tab("C", P)])
+    w.intro = [f"Read [the study]({DOI_URL})."]
+    page = finalize_page(w, DOI_CTX, include_revision=False)
+    assert page.intro == [f"Read [the study]({DOI_URL})."]
+    assert page.notes == []
+
+
 def test_source_context_collects_urls_and_refs():
     assert CTX.urls == {"https://www.tga.gov.au/guidance"}
     assert CTX.image_refs == {"IMG-01"}
@@ -64,6 +91,20 @@ def test_table_rows_are_padded_and_bad_widths_dropped():
     page = finalize_page(wire([tab("A", block), tab("B", P), tab("C", P)]), CTX, include_revision=False)
     table = page.tabs[0].blocks[0]
     assert table.rows == [["TCA", ""], ["SNRI", "duloxetine"]]
+    assert table.col_widths is None
+
+
+def test_table_fractional_col_widths_are_scaled_to_percent():
+    block = {"type": "table", "headers": ["Class", "Agents"], "col_widths": [0.26, 0.74], "rows": [["TCA", "amitriptyline"]]}
+    page = finalize_page(wire([tab("A", block), tab("B", P), tab("C", P)]), CTX, include_revision=False)
+    table = page.tabs[0].blocks[0]
+    assert table.col_widths == [26.0, 74.0]
+
+
+def test_table_col_widths_with_bad_sum_are_dropped():
+    block = {"type": "table", "headers": ["Class", "Agents"], "col_widths": [10, 10], "rows": [["TCA", "amitriptyline"]]}
+    page = finalize_page(wire([tab("A", block), tab("B", P), tab("C", P)]), CTX, include_revision=False)
+    table = page.tabs[0].blocks[0]
     assert table.col_widths is None
 
 
