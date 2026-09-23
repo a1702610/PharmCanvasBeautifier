@@ -1,0 +1,26 @@
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Lato:wght@400;700&family=Roboto+Serif:opsz,wght@8..144,400;8..144,600&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --color-navy: #140f50;
+  --color-purple: #836bff;
+  --color-purple-soft: #f1eeff;
+  --color-brightblue: #1448ff;
+  --color-brightblue-dark: #0f3ae0;
+  --color-limestone: #f8efe0;
+  --color-limestone-soft: #fcf8f1;
+  --color-ink-muted: #5b587a;
+  --color-line: #e7e3f3;
+
+  --font-serif: "Roboto Serif", Georgia, serif;
+  --font-display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+body {
+  @apply bg-white font-sans text-navy antialiased;
+}
+
+::selection {
+  background: #836bff33;
+}
