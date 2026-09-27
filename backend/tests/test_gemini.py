@@ -30,12 +30,20 @@ class ApiError(Exception):
         self.code = code
 
 
-def run(models, images=()):
+def run(models, images=(), sleeps=None):
     client = SimpleNamespace(aio=SimpleNamespace(models=models))
+    recorded = sleeps if sleeps is not None else []
+
+    async def fake_sleep(seconds):
+        recorded.append(seconds)
+
     return asyncio.run(gemini.generate_structured(
         api_key="k", system_prompt="sys", prompt="p", images=list(images),
-        schema=Small, client_factory=lambda key: client,
+        schema=Small, client_factory=lambda key: client, sleep=fake_sleep,
     ))
+
+
+BUSY = "503 UNAVAILABLE. This model is currently experiencing high demand."
 
 
 def test_success_first_try():
@@ -80,6 +88,37 @@ def test_rate_limit_maps_to_429():
         run(FakeModels([ApiError(429, "RESOURCE_EXHAUSTED")]))
     assert err.value.status_code == 429
     assert err.value.message == gemini.RATE_MESSAGE
+
+
+def test_busy_model_is_retried_with_backoff():
+    models = FakeModels([ApiError(503, BUSY), ApiError(503, BUSY), '{"title": "Pain"}'])
+    sleeps = []
+    assert run(models, sleeps=sleeps).title == "Pain"
+    assert len(models.calls) == 3
+    assert sleeps == list(gemini.BUSY_DELAYS[:2])
+
+
+def test_busy_model_gives_busy_message_when_retries_run_out():
+    models = FakeModels([ApiError(503, BUSY)] * (len(gemini.BUSY_DELAYS) + 1))
+    sleeps = []
+    with pytest.raises(gemini.GeminiError) as err:
+        run(models, sleeps=sleeps)
+    assert err.value.status_code == 503
+    assert err.value.message == gemini.BUSY_MESSAGE
+    assert len(models.calls) == len(gemini.BUSY_DELAYS) + 1
+    assert sleeps == list(gemini.BUSY_DELAYS)
+
+
+def test_busy_retries_do_not_use_up_invalid_json_attempts():
+    models = FakeModels([ApiError(503, BUSY), "{oops", '{"title": "Pain"}'])
+    assert run(models).title == "Pain"
+    assert len(models.calls) == 3
+
+
+def test_automatic_function_calling_is_disabled():
+    models = FakeModels(['{"title": "Pain"}'])
+    run(models)
+    assert models.calls[0]["config"].automatic_function_calling.disable is True
 
 
 def test_images_are_labelled_parts():

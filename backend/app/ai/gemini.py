@@ -1,6 +1,7 @@
+import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Callable, TypeVar
+from typing import Awaitable, Callable, TypeVar
 
 from google import genai
 from google.genai import types
@@ -11,9 +12,13 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 ATTEMPTS = 2
+# Seconds to wait before each retry when Gemini reports it is overloaded (503).
+# These retries don't count towards ATTEMPTS.
+BUSY_DELAYS = (3, 8, 15)
 
 KEY_MESSAGE = "Your Gemini key was rejected. Check it under Insert API Key."
 RATE_MESSAGE = "Gemini's free limit was reached. Wait a minute and try again."
+BUSY_MESSAGE = "Gemini is very busy right now (high demand on Google's side). Please try again in a minute or two."
 FAILED_MESSAGE = "Generation failed, please try again."
 
 
@@ -42,6 +47,8 @@ def _classify(exc: Exception) -> str | None:
         return "key"
     if code == 429 or "resource_exhausted" in message or "quota" in message:
         return "rate"
+    if code in (503, 504) or "unavailable" in message or "overloaded" in message:
+        return "busy"
     return None
 
 
@@ -61,6 +68,7 @@ async def generate_structured(
     images: list[ImagePart],
     schema: type[T],
     client_factory: Callable[[str], object] = _build_client,
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
 ) -> T:
     client = client_factory(api_key)
     config = types.GenerateContentConfig(
@@ -70,10 +78,13 @@ async def generate_structured(
         temperature=1.0,
         max_output_tokens=65536,
         thinking_config=types.ThinkingConfig(thinking_level="low"),
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
     contents = build_contents(prompt, images)
     last_error: Exception | None = None
-    for attempt in range(1, ATTEMPTS + 1):
+    attempt = 0
+    busy_retries = 0
+    while attempt < ATTEMPTS:
         try:
             response = await client.aio.models.generate_content(
                 model=settings.GEMINI_MODEL, contents=contents, config=config,
@@ -86,13 +97,20 @@ async def generate_structured(
                 raise GeminiError(RATE_MESSAGE, 429) from exc
             last_error = exc
             logger.warning(
-                "Gemini call failed (attempt %d): %s: %s",
-                attempt, type(exc).__name__, str(exc)[:300],
+                "Gemini call failed: %s: %s", type(exc).__name__, str(exc)[:300],
             )
+            if kind == "busy":
+                if busy_retries == len(BUSY_DELAYS):
+                    raise GeminiError(BUSY_MESSAGE, 503) from exc
+                await sleep(BUSY_DELAYS[busy_retries])
+                busy_retries += 1
+                continue
+            attempt += 1
             continue
         try:
             return schema.model_validate_json(response.text or "")
         except (ValidationError, ValueError) as exc:
             last_error = exc
+            attempt += 1
             logger.warning("Gemini returned invalid JSON (attempt %d)", attempt)
     raise GeminiError(FAILED_MESSAGE, 502) from last_error
