@@ -6,7 +6,7 @@ echo ============================================
 echo.
 echo Setting up backend...
 cd /d "%~dp0backend"
-python -m venv venv
+python -m venv --clear venv
 call venv\Scripts\activate.bat
 pip install -r requirements-dev.txt
 if not exist ".env" copy ".env.example" ".env"
