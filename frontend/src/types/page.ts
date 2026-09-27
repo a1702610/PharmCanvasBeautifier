@@ -19,6 +19,11 @@ export type EvidenceChild =
   | { type: "citation"; text: string }
   | { type: "references"; items: string[] };
 
+export interface QuestionBlock {
+  question: string;
+  answer: string;
+}
+
 export type Block =
   | { type: "heading"; text: string }
   | { type: "paragraph"; text: string }
@@ -30,7 +35,12 @@ export type Block =
   | { type: "evidence"; title: string; children: EvidenceChild[] }
   | { type: "citation"; text: string }
   | { type: "link"; lead_in: string; url: string; link_text: string }
-  | FigureBlock;
+  | FigureBlock
+  | { type: "takeaways"; items: string[] }
+  | { type: "self_check"; questions: QuestionBlock[] }
+  | { type: "counselling"; title?: string; items: string[] }
+  | { type: "tip"; body: string }
+  | { type: "critical"; title?: string; body?: string; items?: string[] };
 
 export interface Tab {
   id: string;

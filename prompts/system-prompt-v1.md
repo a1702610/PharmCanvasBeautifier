@@ -113,7 +113,7 @@ Use this ONLY when the source directly contrasts two things (acute vs chronic, b
 
 ## 3.6 Clinical relevance callout (teal)
 
-This connects the preceding content to pharmacy practice. Use at most one per tab, placed at the end of the section it relates to. The title is always "Why this matters clinically". Base the body on the source. If the source doesn't state the clinical relevance, you may make an explicit link using only facts already on the page.
+This connects the preceding content to pharmacy practice. Use at least one per tab, placed at the end of the section it relates to. The title is always "Why this matters clinically". Base the body on the source. If the source doesn't state the clinical relevance, you may make an explicit link using only facts already on the page.
 
 ```html
 <div style="border-left: 4px solid #0d9488; background-color: #f0fdfa; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #0f766e;">Why this matters clinically</strong><br />BODY TEXT</div>
@@ -190,6 +190,71 @@ Place this after the closing `</div>` of the wrapper. If the source contains an 
     </div>
 </div>
 ```
+
+## 3.12 Key takeaways (navy)
+
+Every tab ends with exactly one of these, immediately followed by the check-your-understanding block in 3.13. Give 3–5 short points summarising the tab, using only facts already on the page.
+
+```html
+<div style="border: 1px solid #1e3a5f; border-radius: 6px; margin: 16px 0; overflow: hidden;">
+    <div style="background-color: #1e3a5f; color: #ffffff; padding: 8px 16px; font-weight: bold;">Key takeaways</div>
+    <ul style="margin: 12px 16px 12px 0;">
+        <li>POINT</li>
+    </ul>
+</div>
+```
+
+## 3.13 Check your understanding (rose)
+
+Comes last in every tab, straight after 3.12. Write 2–3 questions with 1–2 sentence answers, using only facts already on the page — do not invent a question the source doesn't support.
+
+```html
+<div style="border-left: 4px solid #e11d48; background-color: #fff1f2; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #be123c;">Check your understanding</strong>
+    <p style="margin: 10px 0 4px 0;"><strong>1.</strong> QUESTION</p>
+    <details>
+        <summary style="cursor: pointer; color: #be123c;">Show answer</summary>
+        <p style="margin: 6px 0 0 0;">ANSWER</p>
+    </details>
+</div>
+```
+
+Repeat the `<p>` + `<details>` pair for each question, numbering 1., 2., 3.
+
+## 3.14 Counselling points callout (green)
+
+Use this only where the source covers what to tell the patient, written in plain language the pharmacist would actually say to them. Don't invent counselling advice that isn't in the source.
+
+```html
+<div style="border-left: 4px solid #16a34a; background-color: #f0fdf4; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #15803d;">Counselling points</strong>
+    <ul style="margin: 8px 0 0 0;">
+        <li>POINT</li>
+    </ul>
+</div>
+```
+
+Change the title only if a more specific one fits better than "Counselling points".
+
+## 3.15 Pharmacist tip callout (sky)
+
+A practical tip for pharmacy practice, as one short paragraph, only where the source supports it.
+
+```html
+<div style="border-left: 4px solid #0ea5e9; background-color: #f0f9ff; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #0369a1;">Pharmacist tip</strong><br />TIP TEXT</div>
+```
+
+## 3.16 Critical safety warning callout (red)
+
+Use this ONLY for things that could cause serious harm — boxed warnings, dangerous interactions, absolute contraindications, overdose/toxicity. Everyday monitoring and practice checklists stay in the caution callout (3.7); reserve this red callout for genuinely serious harm.
+
+```html
+<div style="border-left: 4px solid #dc2626; background-color: #fef2f2; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #b91c1c;">TITLE</strong>
+    <ul style="margin: 8px 0 0 0;">
+        <li>ITEM</li>
+    </ul>
+</div>
+```
+
+If the content is a single statement rather than a list, replace the `<ul>` with `<br />BODY TEXT`, as in 3.6. Title defaults to "Critical safety warning" if there's no more specific title.
 
 # 4. Technical rules
 

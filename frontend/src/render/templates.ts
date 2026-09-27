@@ -164,5 +164,39 @@ export function blockLines(block: Block, ctx: RenderContext): string[] {
     }
     case "figure":
       return figureLines(block, ctx);
+    case "takeaways":
+      return [
+        `<div style="border: 1px solid ${NAVY}; border-radius: 6px; margin: 16px 0; overflow: hidden;">`,
+        ...indent([
+          `<div style="background-color: ${NAVY}; color: #ffffff; padding: 8px 16px; font-weight: bold;">Key takeaways</div>`,
+          ...listLines(block.items, false, "margin: 12px 16px 12px 0;"),
+        ]),
+        "</div>",
+      ];
+    case "self_check": {
+      const open = `<div style="${callout("#e11d48", "#fff1f2")}"><strong style="color: #be123c;">Check your understanding</strong>`;
+      const body = block.questions.flatMap((q, i) => [
+        `<p style="margin: 10px 0 4px 0;"><strong>${i + 1}.</strong> ${renderInline(q.question)}</p>`,
+        "<details>",
+        ...indent([
+          '<summary style="cursor: pointer; color: #be123c;">Show answer</summary>',
+          `<p style="margin: 6px 0 0 0;">${renderInline(q.answer)}</p>`,
+        ]),
+        "</details>",
+      ]);
+      return [open, ...indent(body), "</div>"];
+    }
+    case "counselling": {
+      const open = `<div style="${callout("#16a34a", "#f0fdf4")}"><strong style="color: #15803d;">${renderInline(block.title ?? "Counselling points")}</strong>`;
+      return [open, ...indent(listLines(block.items, false, "margin: 8px 0 0 0;")), "</div>"];
+    }
+    case "tip":
+      return [`<div style="${callout("#0ea5e9", "#f0f9ff")}"><strong style="color: #0369a1;">Pharmacist tip</strong><br />${renderInline(block.body)}</div>`];
+    case "critical": {
+      const open = `<div style="${callout("#dc2626", "#fef2f2")}"><strong style="color: #b91c1c;">${renderInline(block.title ?? "Critical safety warning")}</strong>`;
+      if (!block.items?.length) return [`${open}<br />${renderInline(block.body ?? "")}</div>`];
+      const head = block.body ? `${open}<br />${renderInline(block.body)}` : open;
+      return [head, ...indent(listLines(block.items, false, "margin: 8px 0 0 0;")), "</div>"];
+    }
   }
 }

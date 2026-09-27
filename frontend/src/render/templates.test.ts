@@ -173,6 +173,106 @@ describe("block templates", () => {
       '<p style="text-align: center;"><img src="https://learn.adelaide.edu.au/courses/1/files/2/preview" alt="Opioid ladder" width="616" height="394" data-api-endpoint="https://learn.adelaide.edu.au/api/v1/courses/1/files/2" data-api-returntype="File"/></p>',
     );
   });
+
+  it("takeaways", () => {
+    expect(render({ type: "takeaways", items: ["A", "B"] })).toBe(
+      [
+        '<div style="border: 1px solid #1e3a5f; border-radius: 6px; margin: 16px 0; overflow: hidden;">',
+        '    <div style="background-color: #1e3a5f; color: #ffffff; padding: 8px 16px; font-weight: bold;">Key takeaways</div>',
+        '    <ul style="margin: 12px 16px 12px 0;">',
+        "        <li>A</li>",
+        "        <li>B</li>",
+        "    </ul>",
+        "</div>",
+      ].join("\n"),
+    );
+  });
+
+  it("self_check with two questions, numbered 1. and 2.", () => {
+    expect(
+      render({
+        type: "self_check",
+        questions: [
+          { question: "Q1", answer: "A1" },
+          { question: "Q2", answer: "A2" },
+        ],
+      }),
+    ).toBe(
+      [
+        '<div style="border-left: 4px solid #e11d48; background-color: #fff1f2; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #be123c;">Check your understanding</strong>',
+        '    <p style="margin: 10px 0 4px 0;"><strong>1.</strong> Q1</p>',
+        "    <details>",
+        '        <summary style="cursor: pointer; color: #be123c;">Show answer</summary>',
+        '        <p style="margin: 6px 0 0 0;">A1</p>',
+        "    </details>",
+        '    <p style="margin: 10px 0 4px 0;"><strong>2.</strong> Q2</p>',
+        "    <details>",
+        '        <summary style="cursor: pointer; color: #be123c;">Show answer</summary>',
+        '        <p style="margin: 6px 0 0 0;">A2</p>',
+        "    </details>",
+        "</div>",
+      ].join("\n"),
+    );
+  });
+
+  it("counselling callout defaults its title, and accepts a custom one", () => {
+    expect(render({ type: "counselling", items: ["Take with food"] })).toBe(
+      [
+        '<div style="border-left: 4px solid #16a34a; background-color: #f0fdf4; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #15803d;">Counselling points</strong>',
+        '    <ul style="margin: 8px 0 0 0;">',
+        "        <li>Take with food</li>",
+        "    </ul>",
+        "</div>",
+      ].join("\n"),
+    );
+    expect(render({ type: "counselling", title: "Before you start", items: ["Item"] })).toBe(
+      [
+        '<div style="border-left: 4px solid #16a34a; background-color: #f0fdf4; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #15803d;">Before you start</strong>',
+        '    <ul style="margin: 8px 0 0 0;">',
+        "        <li>Item</li>",
+        "    </ul>",
+        "</div>",
+      ].join("\n"),
+    );
+  });
+
+  it("tip callout", () => {
+    expect(render({ type: "tip", body: "Shake well before use." })).toBe(
+      '<div style="border-left: 4px solid #0ea5e9; background-color: #f0f9ff; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #0369a1;">Pharmacist tip</strong><br />Shake well before use.</div>',
+    );
+  });
+
+  it("critical callout with items (default title), body only (custom title), and items + body", () => {
+    expect(render({ type: "critical", items: ["Risk of serotonin syndrome"] })).toBe(
+      [
+        '<div style="border-left: 4px solid #dc2626; background-color: #fef2f2; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #b91c1c;">Critical safety warning</strong>',
+        '    <ul style="margin: 8px 0 0 0;">',
+        "        <li>Risk of serotonin syndrome</li>",
+        "    </ul>",
+        "</div>",
+      ].join("\n"),
+    );
+    expect(render({ type: "critical", title: "Overdose risk", body: "Doses above 4 g/day can cause liver failure." })).toBe(
+      '<div style="border-left: 4px solid #dc2626; background-color: #fef2f2; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #b91c1c;">Overdose risk</strong><br />Doses above 4 g/day can cause liver failure.</div>',
+    );
+    expect(
+      render({
+        type: "critical",
+        title: "Boxed warning",
+        body: "Contraindicated in pregnancy.",
+        items: ["Category X teratogen", "Discontinue immediately if pregnancy occurs"],
+      }),
+    ).toBe(
+      [
+        '<div style="border-left: 4px solid #dc2626; background-color: #fef2f2; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #b91c1c;">Boxed warning</strong><br />Contraindicated in pregnancy.',
+        '    <ul style="margin: 8px 0 0 0;">',
+        "        <li>Category X teratogen</li>",
+        "        <li>Discontinue immediately if pregnancy occurs</li>",
+        "    </ul>",
+        "</div>",
+      ].join("\n"),
+    );
+  });
 });
 
 describe("withAlt", () => {
