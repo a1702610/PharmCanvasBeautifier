@@ -7,9 +7,10 @@ import re
 from dataclasses import dataclass
 
 from app.ai.schema import (
-    Block, Caution, Citation, Clinical, ContrastTable, Evidence, EvidenceChild,
-    Figure, Heading, Link, ListBlock, Note, Page, Paragraph, References,
-    Revision, Tab, Table, WireBlock, WireChild, WirePage, WireTab,
+    Block, Caution, Citation, Clinical, Counselling, ContrastTable, Critical,
+    Evidence, EvidenceChild, Figure, Heading, Link, ListBlock, Note, Page,
+    Paragraph, Question, References, Revision, SelfCheck, Tab, Table,
+    Takeaways, Tip, WireBlock, WireChild, WirePage, WireTab,
 )
 
 # A URL segment made of "plain" characters or a single balanced (...) group, so a
@@ -161,6 +162,30 @@ class _Finalizer:
             return self._link(b)
         if t == "figure":
             return self.figure(b.ref, b.alt, b.caption)
+        if t == "takeaways":
+            items = self.texts(b.items)
+            return Takeaways(items=items) if items else None
+        if t == "self_check":
+            questions = []
+            for q in b.questions or []:
+                question, answer = self.text(q.question), self.text(q.answer)
+                if question and answer:
+                    questions.append(Question(question=question, answer=answer))
+            return SelfCheck(questions=questions) if questions else None
+        if t == "counselling":
+            items = self.texts(b.items)
+            if not items:
+                return None
+            return Counselling(title=self.text(b.title) or None, items=items)
+        if t == "tip":
+            body = self.text(b.body)
+            return Tip(body=body) if body else None
+        if t == "critical":
+            body = self.text(b.body) or None
+            items = self.texts(b.items) or None
+            if not body and not items:
+                return None
+            return Critical(title=self.text(b.title) or None, body=body, items=items)
         return None
 
     def tab(self, w: WireTab, tab_id: str) -> Tab | None:
@@ -179,6 +204,9 @@ def finalize_page(wire: WirePage, ctx: SourceContext, include_revision: bool) ->
             tabs.append(t)
     if not 3 <= len(tabs) <= 8:
         f.note(f"This page has {len(tabs)} tabs; 3–8 is recommended.")
+    for t in tabs:
+        if not any(isinstance(b, Clinical) for b in t.blocks):
+            f.note(f"Tab '{t.title}' has no 'Why this matters clinically' callout.")
 
     embed_ref = (wire.revision.embed_ref or "").strip() or None
     if embed_ref and embed_ref not in ctx.embed_refs:
@@ -205,4 +233,6 @@ def finalize_tab(wire: WireTab, ctx: SourceContext, tab_id: str) -> tuple[Tab, l
     t = f.tab(wire, tab_id)
     if t is None:
         raise ValueError("The regenerated tab has no content.")
+    if not any(isinstance(b, Clinical) for b in t.blocks):
+        f.note(f"Tab '{t.title}' has no 'Why this matters clinically' callout.")
     return t, f.notes

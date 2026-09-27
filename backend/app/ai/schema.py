@@ -21,6 +21,7 @@ class Note(BaseModel):
 BlockType = Literal[
     "heading", "paragraph", "list", "table", "contrast_table", "clinical",
     "caution", "evidence", "citation", "link", "figure",
+    "takeaways", "self_check", "counselling", "tip", "critical",
 ]
 ChildType = Literal["paragraph", "list", "figure", "citation", "references"]
 
@@ -32,6 +33,11 @@ class WireChild(BaseModel):
     ref: str | None = None
     alt: str | None = None
     caption: str | None = None
+
+
+class WireQuestion(BaseModel):
+    question: str | None = None
+    answer: str | None = None
 
 
 class WireBlock(BaseModel):
@@ -53,6 +59,7 @@ class WireBlock(BaseModel):
     ref: str | None = None
     alt: str | None = None
     caption: str | None = None
+    questions: list[WireQuestion] | None = None
 
 
 class WireTab(BaseModel):
@@ -141,6 +148,39 @@ class References(BaseModel):
     items: list[str]
 
 
+class Takeaways(BaseModel):
+    type: Literal["takeaways"] = "takeaways"
+    items: list[str]
+
+
+class Question(BaseModel):
+    question: str
+    answer: str
+
+
+class SelfCheck(BaseModel):
+    type: Literal["self_check"] = "self_check"
+    questions: list[Question]
+
+
+class Counselling(BaseModel):
+    type: Literal["counselling"] = "counselling"
+    title: str | None = None
+    items: list[str]
+
+
+class Tip(BaseModel):
+    type: Literal["tip"] = "tip"
+    body: str
+
+
+class Critical(BaseModel):
+    type: Literal["critical"] = "critical"
+    title: str | None = None
+    body: str | None = None
+    items: list[str] | None = None
+
+
 EvidenceChild = Annotated[
     Union[Paragraph, ListBlock, Figure, Citation, References],
     Field(discriminator="type"),
@@ -155,7 +195,8 @@ class Evidence(BaseModel):
 
 Block = Annotated[
     Union[Heading, Paragraph, ListBlock, Table, ContrastTable, Clinical,
-          Caution, Evidence, Citation, Link, Figure],
+          Caution, Evidence, Citation, Link, Figure,
+          Takeaways, SelfCheck, Counselling, Tip, Critical],
     Field(discriminator="type"),
 ]
 

@@ -72,7 +72,9 @@ def test_generate_maps_gemini_errors(calls):
 
 
 def test_regenerate_tab_keeps_id_and_passes_instruction(calls):
-    calls.outcome["value"] = WireTab.model_validate({"title": "Management", "blocks": [P, P]})
+    calls.outcome["value"] = WireTab.model_validate(
+        {"title": "Management", "blocks": [P, {"type": "clinical", "body": "Relevant to practice."}]}
+    )
     body = {
         "text": TEXT,
         "images": IMAGES,
