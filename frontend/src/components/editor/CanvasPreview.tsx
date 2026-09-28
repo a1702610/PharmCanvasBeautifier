@@ -1,5 +1,4 @@
 import {
-  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -80,41 +79,47 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit }:
   // The `safe` HTML actually currently in the DOM, so we only tear down and rebuild it when
   // the content really changed (not e.g. on every `editable` toggle).
   const renderedSafe = useRef<string | null>(null);
-  // Timers for onEdit calls deferred out of focusout (see handleBlur); cleared on unmount so a
-  // save never fires for/after an unmounted preview.
-  const pendingEdits = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  // Set by handleBlur, immediately before it calls onEdit, for an edit that originated in this
+  // preview. The resulting re-render's html change is therefore just this element's own new
+  // text landing back in `html` - the DOM already shows it - so the layout effect below skips
+  // rebuilding the container for that one change instead of tearing down/recreating every node
+  // (which would either strand focus mid-flight to wherever the user clicked next, or, if the
+  // user is already typing in a different field by the time this lands, blow away that field's
+  // own not-yet-saved keystrokes by replacing it with its last-persisted content). Consumed
+  // (reset) on every effect run regardless of whether `safe` actually changed, so it can never
+  // linger and suppress the rebuild for an unrelated later (external) change.
+  const skipRebuild = useRef(false);
 
-  useEffect(
-    () => () => {
-      pendingEdits.current.forEach((timer) => clearTimeout(timer));
-      pendingEdits.current.clear();
-    },
-    [],
-  );
-
-  // Replaces the container's HTML manually (instead of dangerouslySetInnerHTML) so a
-  // re-render triggered by saving one [data-edit] element's edit doesn't blow away another
-  // element's in-progress edit and caret position while it still has focus: we snapshot which
-  // data-edit path (if any) is currently focused and its caret offset before replacing the
-  // DOM, then restore focus/caret to the element with the same path afterward.
+  // Replaces the container's HTML manually (instead of dangerouslySetInnerHTML) so an
+  // *external* re-render (undo, regenerate, loading another page, toggling Edit text) doesn't
+  // blow away another element's in-progress edit and caret position while it still has focus:
+  // we snapshot which data-edit path (if any) is currently focused and its caret offset before
+  // replacing the DOM, then restore focus/caret to the element with the same path afterward.
   useLayoutEffect(() => {
     const container = ref.current;
     if (!container) return;
 
+    const skip = skipRebuild.current;
+    skipRebuild.current = false;
+
     if (renderedSafe.current !== safe) {
-      const active = document.activeElement;
-      const focused = active instanceof HTMLElement && container.contains(active) ? active.closest<HTMLElement>("[data-edit]") : null;
-      const focusedPath = focused?.getAttribute("data-edit") ?? null;
-      const caretOffset = focused ? getCaretOffset(focused) : 0;
+      if (skip) {
+        renderedSafe.current = safe;
+      } else {
+        const active = document.activeElement;
+        const focused = active instanceof HTMLElement && container.contains(active) ? active.closest<HTMLElement>("[data-edit]") : null;
+        const focusedPath = focused?.getAttribute("data-edit") ?? null;
+        const caretOffset = focused ? getCaretOffset(focused) : 0;
 
-      container.innerHTML = safe;
-      renderedSafe.current = safe;
+        container.innerHTML = safe;
+        renderedSafe.current = safe;
 
-      if (focusedPath) {
-        const restored = container.querySelector<HTMLElement>(`[data-edit="${escapeAttrSelector(focusedPath)}"]`);
-        if (restored) {
-          restored.focus();
-          setCaretOffset(restored, caretOffset);
+        if (focusedPath) {
+          const restored = container.querySelector<HTMLElement>(`[data-edit="${escapeAttrSelector(focusedPath)}"]`);
+          if (restored) {
+            restored.focus();
+            setCaretOffset(restored, caretOffset);
+          }
         }
       }
     }
@@ -156,18 +161,12 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit }:
         // Don't save an empty edit; put back what was there before.
         if (focusHtml.current !== null) target.innerHTML = focusHtml.current;
       } else if (value !== focusValue.current) {
-        // Defer: calling onEdit synchronously here can trigger a parent re-render (via
-        // setSaved) before the browser has finished moving focus to whatever the user clicked
-        // next. Our innerHTML rebuild in the layout effect above would then run while that
-        // focus change is still in flight, removing the very DOM node it was targeting and
-        // stranding focus on nothing (and losing whatever the user had already typed there).
-        // Waiting a tick lets focus settle on the new element first; the layout effect's own
-        // focus snapshot/restore then carries that focus through the rebuild once it happens.
-        const timer = setTimeout(() => {
-          pendingEdits.current.delete(timer);
-          onEdit(path, value);
-        }, 0);
-        pendingEdits.current.add(timer);
+        // Call onEdit synchronously (a click on Copy HTML/Undo/Export right after typing must
+        // see this edit, and those read savedRef/state that onEdit's caller updates). Mark this
+        // as a self-originated change first, so the layout effect above skips rebuilding the
+        // DOM for it - see the comment on `skipRebuild` for why.
+        skipRebuild.current = true;
+        onEdit(path, value);
       }
     }
     focusValue.current = null;
