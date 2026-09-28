@@ -24,6 +24,20 @@ describe("htmlToMarkdown", () => {
     expect(htmlToMarkdown(el("<i>Basic Clin Pharmacol</i> Toxicol"))).toBe("*Basic Clin Pharmacol* Toxicol");
   });
 
+  it("moves whitespace typed at the edge of a bold/italic run outside the ** / * markers", () => {
+    // e.g. cursor at the end of a bolded word, Ctrl+B, then typing " BOLD" leaves the space
+    // inside the <strong>; it must not end up inside the markers as "** BOLD**".
+    expect(htmlToMarkdown(el("amitriptyline<strong> BOLD</strong>"))).toBe("amitriptyline **BOLD**");
+    expect(htmlToMarkdown(el("<strong>BOLD </strong>after"))).toBe("**BOLD** after");
+    expect(htmlToMarkdown(el("a<em> italic </em>b"))).toBe("a *italic* b");
+  });
+
+  it("skips the markers entirely for an empty or whitespace-only bold/italic run", () => {
+    expect(htmlToMarkdown(el("a<strong></strong>b"))).toBe("ab");
+    expect(htmlToMarkdown(el("a<strong> </strong>b"))).toBe("a b");
+    expect(htmlToMarkdown(el("a<em>   </em>b"))).toBe("a b");
+  });
+
   it("converts an https link to markdown [text](url)", () => {
     expect(htmlToMarkdown(el('See the <a href="https://tga.gov.au/guidance">TGA guidance</a>.'))).toBe(
       "See the [TGA guidance](https://tga.gov.au/guidance).",

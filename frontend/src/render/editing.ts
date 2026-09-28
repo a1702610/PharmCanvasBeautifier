@@ -22,6 +22,17 @@ function childrenInline(el: Element): string {
   return Array.from(el.childNodes).map(inlineToMarkdown).join("");
 }
 
+/** Wraps `inner` in `marker` on each side, but keeps any leading/trailing whitespace outside
+ *  the markers (so typing " BOLD" at the end of a bolded run produces " **BOLD**", not
+ *  "** BOLD**"), and skips the markers entirely when `inner` is empty or whitespace-only —
+ *  there's nothing to bold/italicize, so markers would just be inert punctuation. */
+function wrapMarker(marker: string, inner: string): string {
+  const match = inner.match(/^(\s*)([\s\S]*?)(\s*)$/)!;
+  const [, leading, core, trailing] = match;
+  if (!core) return inner;
+  return `${leading}${marker}${core}${marker}${trailing}`;
+}
+
 function inlineToMarkdown(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
   if (node.nodeType !== Node.ELEMENT_NODE) return "";
@@ -31,10 +42,10 @@ function inlineToMarkdown(node: Node): string {
       return " ";
     case "STRONG":
     case "B":
-      return `**${childrenInline(el)}**`;
+      return wrapMarker("**", childrenInline(el));
     case "EM":
     case "I":
-      return `*${childrenInline(el)}*`;
+      return wrapMarker("*", childrenInline(el));
     case "A": {
       const href = el.getAttribute("href") ?? "";
       const text = childrenInline(el);

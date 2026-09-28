@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -79,6 +80,17 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit }:
   // The `safe` HTML actually currently in the DOM, so we only tear down and rebuild it when
   // the content really changed (not e.g. on every `editable` toggle).
   const renderedSafe = useRef<string | null>(null);
+  // Timers for onEdit calls deferred out of focusout (see handleBlur); cleared on unmount so a
+  // save never fires for/after an unmounted preview.
+  const pendingEdits = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+
+  useEffect(
+    () => () => {
+      pendingEdits.current.forEach((timer) => clearTimeout(timer));
+      pendingEdits.current.clear();
+    },
+    [],
+  );
 
   // Replaces the container's HTML manually (instead of dangerouslySetInnerHTML) so a
   // re-render triggered by saving one [data-edit] element's edit doesn't blow away another
@@ -144,7 +156,18 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit }:
         // Don't save an empty edit; put back what was there before.
         if (focusHtml.current !== null) target.innerHTML = focusHtml.current;
       } else if (value !== focusValue.current) {
-        onEdit(path, value);
+        // Defer: calling onEdit synchronously here can trigger a parent re-render (via
+        // setSaved) before the browser has finished moving focus to whatever the user clicked
+        // next. Our innerHTML rebuild in the layout effect above would then run while that
+        // focus change is still in flight, removing the very DOM node it was targeting and
+        // stranding focus on nothing (and losing whatever the user had already typed there).
+        // Waiting a tick lets focus settle on the new element first; the layout effect's own
+        // focus snapshot/restore then carries that focus through the rebuild once it happens.
+        const timer = setTimeout(() => {
+          pendingEdits.current.delete(timer);
+          onEdit(path, value);
+        }, 0);
+        pendingEdits.current.add(timer);
       }
     }
     focusValue.current = null;
