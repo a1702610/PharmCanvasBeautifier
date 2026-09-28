@@ -45,3 +45,17 @@
   .canvas-preview .dp-panels-wrapper { grid-template-columns: 1fr; }
   .canvas-preview .is-active > .dp-panel-content { grid-column: 1; grid-row: auto; }
 }
+
+/* Inline text editing (see callouts-spec.md, "Inline text editing"). */
+.canvas-preview.is-editing [data-edit] {
+  cursor: text;
+  border-radius: 2px;
+}
+.canvas-preview.is-editing [data-edit]:hover {
+  outline: 1px dashed #836bff;
+  outline-offset: 2px;
+}
+.canvas-preview.is-editing [data-edit]:focus {
+  outline: 2px solid #836bff;
+  outline-offset: 2px;
+}

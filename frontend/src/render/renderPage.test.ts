@@ -44,3 +44,48 @@ describe("renderPage", () => {
     expect(none).not.toContain("Revision");
   });
 });
+
+describe("renderPage: inline editing", () => {
+  const editablePage: Page = {
+    title: "Chronic pain",
+    intro: ["Chronic pain is common."],
+    tabs: [
+      {
+        id: "t1",
+        title: "Overview",
+        blocks: [
+          { type: "paragraph", text: "Body one." },
+          { type: "list", ordered: false, items: ["First point", "Second point"] },
+          { type: "table", headers: ["Category", "Risk"], rows: [["Pain-related", "Severe pain"]] },
+          { type: "clinical", body: "Untreated pain delays recovery." },
+          { type: "self_check", questions: [{ question: "What is the max daily dose?", answer: "4 grams." }] },
+        ],
+      },
+    ],
+    revision: { include: false },
+    notes: [],
+  };
+
+  it("emits data-edit paths for intro, a paragraph, a list item, a table cell, a clinical body span and a self_check answer", () => {
+    const html = renderPage(editablePage, buildContext([], [], true));
+    expect(html).toContain('<p data-edit="intro.0">Chronic pain is common.</p>');
+    expect(html).toContain('<p data-edit="tabs.0.blocks.0.text">Body one.</p>');
+    expect(html).toContain('<li data-edit="tabs.0.blocks.1.items.0">First point</li>');
+    expect(html).toContain('data-edit="tabs.0.blocks.2.rows.0.1"');
+    expect(html).toContain('<span data-edit="tabs.0.blocks.3.body">Untreated pain delays recovery.</span>');
+    expect(html).toContain('<p data-edit="tabs.0.blocks.4.questions.0.answer" style="margin: 6px 0 0 0;">4 grams.</p>');
+  });
+
+  it("does not add data-edit for the tab heading", () => {
+    const html = renderPage(editablePage, buildContext([], [], true));
+    expect(html).not.toContain('<h3 class="dp-panel-heading" data-edit');
+    expect(html).toContain('<h3 class="dp-panel-heading">Overview</h3>');
+  });
+
+  it("renders byte-identical output when editable is false or absent", () => {
+    const explicitFalse = renderPage(editablePage, buildContext([], [], false));
+    const absent = renderPage(editablePage, buildContext([], []));
+    expect(explicitFalse).toBe(absent);
+    expect(explicitFalse).not.toContain("data-edit");
+  });
+});

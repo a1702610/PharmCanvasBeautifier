@@ -9,6 +9,7 @@ import { RegenerateDialog } from "../components/editor/RegenerateDialog";
 import { TabRail } from "../components/editor/TabRail";
 import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
+import { setAtPath } from "../render/editing";
 import { buildContext, renderPage } from "../render/renderPage";
 import { getPage, savePage, type SavedPage } from "../storage/db";
 import { exportPageJson } from "../storage/exchange";
@@ -23,6 +24,7 @@ export default function EditorPage() {
   const { id } = useParams();
   const [saved, setSaved] = useState<SavedPage | null | undefined>(undefined);
   const [view, setView] = useState<"preview" | "html">("preview");
+  const [editable, setEditable] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [regenTarget, setRegenTarget] = useState<Tab | null>(null);
   const [regenBusy, setRegenBusy] = useState(false);
@@ -35,6 +37,12 @@ export default function EditorPage() {
   const html = useMemo(
     () => (saved ? renderPage(saved.page, buildContext(saved.images, saved.embeds)) : ""),
     [saved],
+  );
+  // Preview-only render, used solely when the "Edit text" toggle is on. Copy HTML, Export
+  // and the HTML view always use the non-editable `html` above.
+  const previewHtml = useMemo(
+    () => (saved && editable ? renderPage(saved.page, buildContext(saved.images, saved.embeds, true)) : html),
+    [saved, editable, html],
   );
   const downloadableRefs = useMemo(
     () => (saved ? usedImageRefs(saved.page).filter((ref) => saved.images.some((i) => i.ref === ref && i.data_b64)) : []),
@@ -106,6 +114,31 @@ export default function EditorPage() {
     }
   }
 
+  async function handleEdit(path: string, value: string) {
+    let nextPage;
+    try {
+      nextPage = setAtPath(current.page, path, value);
+    } catch {
+      toast.error("Couldn't save that edit.");
+      return;
+    }
+    const tabMatch = path.match(/^tabs\.(\d+)\./);
+    try {
+      if (tabMatch) {
+        const tabIndex = Number(tabMatch[1]);
+        const tab = current.page.tabs[tabIndex];
+        const updatedTab = nextPage.tabs[tabIndex];
+        if (tab) {
+          await persist(replaceTab(current, tab.id, updatedTab));
+          return;
+        }
+      }
+      await persist({ ...current, page: nextPage });
+    } catch {
+      toast.error("Couldn't save that edit.");
+    }
+  }
+
   const historyCounts = Object.fromEntries(Object.entries(current.history).map(([k, v]) => [k, v.length]));
 
   return (
@@ -136,23 +169,33 @@ export default function EditorPage() {
         </div>
 
         <div className="min-w-0">
-          <div role="tablist" aria-label="View" className="inline-flex rounded-full border border-line p-1">
-            {(["preview", "html"] as const).map((v) => (
-              <button
-                key={v}
-                role="tab"
-                type="button"
-                aria-selected={view === v}
-                onClick={() => setView(v)}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium ${view === v ? "bg-navy text-white" : "text-ink-muted hover:text-navy"}`}
-              >
-                {v === "preview" ? "Preview" : "HTML"}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <div role="tablist" aria-label="View" className="inline-flex rounded-full border border-line p-1">
+              {(["preview", "html"] as const).map((v) => (
+                <button
+                  key={v}
+                  role="tab"
+                  type="button"
+                  aria-selected={view === v}
+                  onClick={() => setView(v)}
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium ${view === v ? "bg-navy text-white" : "text-ink-muted hover:text-navy"}`}
+                >
+                  {v === "preview" ? "Preview" : "HTML"}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              aria-pressed={editable}
+              onClick={() => setEditable((e) => !e)}
+              className={`rounded-full border border-line px-4 py-1.5 text-sm font-medium ${editable ? "bg-brightblue text-white" : "text-ink-muted hover:text-navy"}`}
+            >
+              Edit text
+            </button>
           </div>
           <div className="mt-4 rounded-2xl border border-line bg-white p-6 shadow-sm">
             {view === "preview" ? (
-              <CanvasPreview html={html} activeIndex={activeIndex} onSelect={setActiveIndex} />
+              <CanvasPreview html={previewHtml} activeIndex={activeIndex} editable={editable} onSelect={setActiveIndex} onEdit={handleEdit} />
             ) : (
               <pre className="max-h-[70vh] overflow-auto rounded-xl bg-limestone-soft p-5 font-mono text-xs leading-relaxed text-navy">
                 <code>{html}</code>

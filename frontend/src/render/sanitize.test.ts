@@ -32,4 +32,9 @@ describe("sanitizePreviewHtml", () => {
     expect(out).toContain('class="dp-panel-group"');
     expect(out).toContain('style="color: red;"');
   });
+
+  it("keeps data-edit attributes used by inline text editing", () => {
+    const out = sanitizePreviewHtml('<p data-edit="intro.0">Chronic pain is common.</p>');
+    expect(out).toContain('data-edit="intro.0"');
+  });
 });

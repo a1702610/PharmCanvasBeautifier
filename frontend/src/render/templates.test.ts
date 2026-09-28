@@ -275,6 +275,80 @@ describe("block templates", () => {
   });
 });
 
+describe("block templates: inline editing (editable context)", () => {
+  const editableCtx: RenderContext = { ...ctx, editable: true };
+  const renderEditable = (b: Block, path: string) => blockLines(b, editableCtx, path).join("\n");
+
+  it("does not add data-edit when editable is true but no path is given", () => {
+    expect(render({ type: "paragraph", text: "Body" })).toBe("<p>Body</p>");
+  });
+
+  it("paragraph text gets data-edit", () => {
+    expect(renderEditable({ type: "paragraph", text: "Body" }, "tabs.0.blocks.1")).toBe(
+      '<p data-edit="tabs.0.blocks.1.text">Body</p>',
+    );
+  });
+
+  it("list items each get data-edit", () => {
+    expect(renderEditable({ type: "list", ordered: false, items: ["A", "B"] }, "tabs.0.blocks.2")).toBe(
+      '<ul>\n    <li data-edit="tabs.0.blocks.2.items.0">A</li>\n    <li data-edit="tabs.0.blocks.2.items.1">B</li>\n</ul>',
+    );
+  });
+
+  it("table headers and cells each get data-edit, including the bolded label column", () => {
+    const html = renderEditable(
+      { type: "table", headers: ["Category", "Risk"], rows: [["Pain", "Severe"]] },
+      "tabs.0.blocks.3",
+    );
+    expect(html).toContain('data-edit="tabs.0.blocks.3.headers.0"');
+    expect(html).toContain('data-edit="tabs.0.blocks.3.headers.1"');
+    expect(html).toContain(`<td data-edit="tabs.0.blocks.3.rows.0.0" ${TD}><strong>Pain</strong></td>`);
+    expect(html).toContain('data-edit="tabs.0.blocks.3.rows.0.1"');
+  });
+
+  it("clinical body is wrapped in a data-edit span (shares its element with the fixed title)", () => {
+    expect(renderEditable({ type: "clinical", body: "Prevention works." }, "tabs.0.blocks.4")).toBe(
+      '<div style="border-left: 4px solid #0d9488; background-color: #f0fdfa; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #0f766e;">Why this matters clinically</strong><br /><span data-edit="tabs.0.blocks.4.body">Prevention works.</span></div>',
+    );
+  });
+
+  it("self_check question and answer get data-edit, but the fixed heading does not", () => {
+    const html = renderEditable(
+      { type: "self_check", questions: [{ question: "Q1", answer: "A1" }] },
+      "tabs.0.blocks.5",
+    );
+    expect(html).not.toContain("data-edit=\"tabs.0.blocks.5.title\"");
+    expect(html).toContain('<span data-edit="tabs.0.blocks.5.questions.0.question">Q1</span>');
+    expect(html).toContain('<p data-edit="tabs.0.blocks.5.questions.0.answer" style="margin: 6px 0 0 0;">A1</p>');
+    expect(html).toContain("Check your understanding</strong>");
+  });
+
+  it("takeaways items get data-edit, fixed title does not", () => {
+    const html = renderEditable({ type: "takeaways", items: ["A"] }, "tabs.0.blocks.6");
+    expect(html).toContain('<li data-edit="tabs.0.blocks.6.items.0">A</li>');
+    expect(html).toContain('<div style="background-color: #1e3a5f; color: #ffffff; padding: 8px 16px; font-weight: bold;">Key takeaways</div>');
+  });
+
+  it("caution title (variable, not fixed) and body/items get data-edit", () => {
+    const html = renderEditable({ type: "caution", title: "Red flag", body: "Refer urgently." }, "tabs.0.blocks.7");
+    expect(html).toContain('<strong data-edit="tabs.0.blocks.7.title" style="color: #b45309;">Red flag</strong>');
+    expect(html).toContain('<span data-edit="tabs.0.blocks.7.body">Refer urgently.</span>');
+  });
+
+  it("figure caption gets data-edit, alt and placeholder do not", () => {
+    const html = renderEditable({ type: "figure", ref: "IMG-01", alt: "Opioid ladder", caption: "AMH Online" }, "tabs.0.blocks.8");
+    expect(html).not.toContain('data-edit="tabs.0.blocks.8.alt"');
+    expect(html).toContain('<span style="font-size: 8pt; color: #64748b;" data-edit="tabs.0.blocks.8.caption">AMH Online</span>');
+  });
+
+  it("counselling default title is not editable (no title field to point at); custom title is", () => {
+    const withDefault = renderEditable({ type: "counselling", items: ["Take with food"] }, "tabs.0.blocks.9");
+    expect(withDefault).not.toContain("data-edit=\"tabs.0.blocks.9.title\"");
+    const withCustom = renderEditable({ type: "counselling", title: "Before you start", items: ["Item"] }, "tabs.0.blocks.9");
+    expect(withCustom).toContain('<strong data-edit="tabs.0.blocks.9.title" style="color: #15803d;">Before you start</strong>');
+  });
+});
+
 describe("withAlt", () => {
   it("keeps a meaningful alt", () => {
     const tag = '<img alt="WHO ladder" src="x"/>';

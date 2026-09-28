@@ -1,25 +1,26 @@
 import type { EmbedInfo, ImageInfo } from "../types/api";
 import type { Page, Tab } from "../types/page";
-import { renderInline } from "./inline";
+import { escapeAttr, renderInline } from "./inline";
 import { blockLines, indent, type RenderContext } from "./templates";
 
 export const PANELS_CLASS =
   "dp-panels-wrapper dp-tabs-pills-group-vertical dp-panel-color-dp-gray dp-panel-active-color-dp-accent dp-panel-hover-color-dp-secondary";
 
-export function buildContext(images: ImageInfo[], embeds: EmbedInfo[]): RenderContext {
+export function buildContext(images: ImageInfo[], embeds: EmbedInfo[], editable = false): RenderContext {
   return {
     images: Object.fromEntries(images.map((i) => [i.ref, i])),
     embeds: Object.fromEntries(embeds.map((e) => [e.ref, e.html])),
+    editable,
   };
 }
 
-function tabLines(tab: Tab, ctx: RenderContext): string[] {
+function tabLines(tab: Tab, ctx: RenderContext, tabIndex: number): string[] {
   return [
     '<div class="dp-panel-group">',
     ...indent([
       `<h3 class="dp-panel-heading">${renderInline(tab.title)}</h3>`,
       '<div class="dp-panel-content">',
-      ...indent(tab.blocks.flatMap((b) => blockLines(b, ctx))),
+      ...indent(tab.blocks.flatMap((b, i) => blockLines(b, ctx, `tabs.${tabIndex}.blocks.${i}`))),
       "</div>",
     ]),
     "</div>",
@@ -51,9 +52,9 @@ export function renderPage(page: Page, ctx: RenderContext): string {
     ...indent([
       '<div class="dp-content-block">',
       ...indent([
-        ...page.intro.map((p) => `<p>${renderInline(p)}</p>`),
+        ...page.intro.map((p, i) => `<p${ctx.editable ? ` data-edit="${escapeAttr(`intro.${i}`)}"` : ""}>${renderInline(p)}</p>`),
         `<div class="${PANELS_CLASS}">`,
-        ...indent(page.tabs.flatMap((t) => tabLines(t, ctx))),
+        ...indent(page.tabs.flatMap((t, i) => tabLines(t, ctx, i))),
         "</div>",
       ]),
       "</div>",
