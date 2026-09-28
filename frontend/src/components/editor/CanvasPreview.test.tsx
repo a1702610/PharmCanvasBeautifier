@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CanvasPreview } from "./CanvasPreview";
@@ -40,14 +40,14 @@ describe("CanvasPreview: self-originated edits don't rebuild the DOM, external c
     container.remove();
   });
 
-  function render(html: string, onEdit: (path: string, value: string) => void) {
+  function render(html: string, onEdit: (path: string, value: string) => boolean) {
     act(() => {
       root.render(<CanvasPreview html={html} activeIndex={0} editable onSelect={() => {}} onEdit={onEdit} />);
     });
   }
 
   it("calls onEdit synchronously on blur (no deferral), and the resulting self-originated re-render leaves the DOM untouched, so a field being typed into elsewhere keeps its unsaved content", () => {
-    const onEdit = vi.fn();
+    const onEdit = vi.fn(() => true);
     render(buildHtml("Para A", "Para B"), onEdit);
 
     const paraA = container.querySelector('[data-edit="tabs.0.blocks.0.text"]') as HTMLElement;
@@ -90,7 +90,7 @@ describe("CanvasPreview: self-originated edits don't rebuild the DOM, external c
   });
 
   it("rebuilds the DOM for an external change (no self-originated edit in flight) and restores focus to the same data-edit path", () => {
-    const onEdit = vi.fn();
+    const onEdit = vi.fn(() => true);
     render(buildHtml("Para A", "Para B"), onEdit);
 
     const paraB = container.querySelector('[data-edit="tabs.0.blocks.1.text"]') as HTMLElement;
@@ -108,7 +108,7 @@ describe("CanvasPreview: self-originated edits don't rebuild the DOM, external c
   });
 
   it("consumes the self-originated flag after one render: a self edit followed by an external change rebuilds normally for that second change", () => {
-    const onEdit = vi.fn();
+    const onEdit = vi.fn(() => true);
     render(buildHtml("Para A", "Para B"), onEdit);
 
     const paraA = container.querySelector('[data-edit="tabs.0.blocks.0.text"]') as HTMLElement;
@@ -128,5 +128,101 @@ describe("CanvasPreview: self-originated edits don't rebuild the DOM, external c
     expect(rebuiltA).not.toBeNull();
     expect(rebuiltA).not.toBe(paraA);
     expect(rebuiltA?.textContent).toBe("Para A EDITED (changed elsewhere)");
+  });
+
+  it("reverts the element and clears the flag immediately when onEdit reports failure, so the next external change still rebuilds", () => {
+    const onEdit = vi.fn(() => false);
+    render(buildHtml("Para <strong>A</strong>", "Para B"), onEdit);
+
+    const paraA = container.querySelector('[data-edit="tabs.0.blocks.0.text"]') as HTMLElement;
+    act(() => paraA.focus());
+    paraA.textContent = "Para A EDITED";
+    act(() => paraA.blur());
+
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    // The failed edit is rolled back to exactly what the element held when it got focus.
+    expect(paraA.innerHTML).toBe("Para <strong>A</strong>");
+
+    // No timers are run here: the flag must already be clear, not merely expiring later.
+    render(buildHtml("Para A (undone elsewhere)", "Para B"), onEdit);
+    const rebuiltA = container.querySelector('[data-edit="tabs.0.blocks.0.text"]');
+    expect(rebuiltA).not.toBe(paraA);
+    expect(rebuiltA?.textContent).toBe("Para A (undone elsewhere)");
+  });
+
+  it("expires the flag on the next macrotask when a successful edit produces no html change, so a later external change still rebuilds", () => {
+    vi.useFakeTimers();
+    try {
+      const onEdit = vi.fn(() => true);
+      const html = buildHtml("Para A", "Para B");
+      render(html, onEdit);
+
+      const paraA = container.querySelector('[data-edit="tabs.0.blocks.0.text"]') as HTMLElement;
+      act(() => paraA.focus());
+      paraA.textContent = "Para A EDITED";
+      act(() => paraA.blur());
+      expect(onEdit).toHaveBeenCalledTimes(1);
+
+      // Parent re-renders but the html string is identical (e.g. the edit normalised back to
+      // the same render), so the layout effect never runs to consume the flag.
+      render(html, onEdit);
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      render(buildHtml("Para A (regenerated)", "Para B"), onEdit);
+      const rebuiltA = container.querySelector('[data-edit="tabs.0.blocks.0.text"]');
+      expect(rebuiltA).not.toBe(paraA);
+      expect(rebuiltA?.textContent).toBe("Para A (regenerated)");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("React flushes the parent's state update from a real blur before the next macrotask, so the flag is consumed by the self-edit render before it expires", async () => {
+    // Verifies the ordering the self-expiring flag relies on, using React's real scheduler:
+    // no act() around the blur (act would force a synchronous flush and prove nothing).
+    const actEnv = globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+    let lastHtml = "";
+    function Harness() {
+      const [html, setHtml] = useState(buildHtml("Para A", "Para B"));
+      lastHtml = html;
+      return (
+        <CanvasPreview
+          html={html}
+          activeIndex={0}
+          editable
+          onSelect={() => {}}
+          onEdit={(_path, value) => {
+            setHtml(buildHtml(value, "Para B"));
+            return true;
+          }}
+        />
+      );
+    }
+    act(() => root.render(<Harness />));
+
+    const paraA = container.querySelector('[data-edit="tabs.0.blocks.0.text"]') as HTMLElement;
+    const paraB = container.querySelector('[data-edit="tabs.0.blocks.1.text"]') as HTMLElement;
+    act(() => paraA.focus());
+    paraA.textContent = "Para A EDITED";
+
+    actEnv.IS_REACT_ACT_ENVIRONMENT = false;
+    try {
+      paraA.blur();
+      paraB.focus();
+      paraB.textContent = "Para B EDITED";
+      // Scheduled after the component's expiry timer, so this resolves only once it has fired.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    } finally {
+      actEnv.IS_REACT_ACT_ENVIRONMENT = true;
+    }
+
+    // The self-edit render did happen...
+    expect(lastHtml).toBe(buildHtml("Para A EDITED", "Para B"));
+    // ...and it saw the flag (it ran before the expiry timer), so nothing was rebuilt.
+    expect(container.querySelector('[data-edit="tabs.0.blocks.0.text"]')).toBe(paraA);
+    expect(container.querySelector('[data-edit="tabs.0.blocks.1.text"]')).toBe(paraB);
+    expect(paraB.textContent).toBe("Para B EDITED");
   });
 });

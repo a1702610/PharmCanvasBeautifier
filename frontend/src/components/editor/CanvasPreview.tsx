@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -18,8 +19,10 @@ interface Props {
   /** Inline text editing (see callouts-spec.md, "Inline text editing"). Off by default. */
   editable: boolean;
   onSelect: (index: number) => void;
-  /** Called on blur of a [data-edit] element, only when its markdown value actually changed. */
-  onEdit: (path: string, value: string) => void;
+  /** Called on blur of a [data-edit] element, only when its markdown value actually changed.
+   *  Returns whether the edit was accepted; on false the element is reverted to its content at
+   *  focus time. */
+  onEdit: (path: string, value: string) => boolean;
 }
 
 /** Character offset of the caret within `container`'s text content, or 0 if there's no
@@ -80,15 +83,30 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit }:
   // the content really changed (not e.g. on every `editable` toggle).
   const renderedSafe = useRef<string | null>(null);
   // Set by handleBlur, immediately before it calls onEdit, for an edit that originated in this
-  // preview. The resulting re-render's html change is therefore just this element's own new
-  // text landing back in `html` - the DOM already shows it - so the layout effect below skips
-  // rebuilding the container for that one change instead of tearing down/recreating every node
-  // (which would either strand focus mid-flight to wherever the user clicked next, or, if the
-  // user is already typing in a different field by the time this lands, blow away that field's
-  // own not-yet-saved keystrokes by replacing it with its last-persisted content). Consumed
-  // (reset) on every effect run regardless of whether `safe` actually changed, so it can never
-  // linger and suppress the rebuild for an unrelated later (external) change.
+  // preview. The resulting re-render's html change is just this element's own new text landing
+  // back in `html` - the DOM already shows it - so the layout effect below skips rebuilding the
+  // container for that one change instead of tearing down/recreating every node (which would
+  // either strand focus mid-flight to wherever the user clicked next, or, if the user is already
+  // typing in a different field by the time this lands, blow away that field's own not-yet-saved
+  // keystrokes by replacing it with its last-persisted content).
+  //
+  // The layout effect only runs when `safe`/`editable` change, so it alone can't guarantee the
+  // flag is cleared: if onEdit rejects the edit, or accepts it but the re-rendered html is
+  // identical, no effect run happens and a stale flag would suppress the next unrelated
+  // external rebuild. So the flag is cleared in three places: by the effect when it consumes it;
+  // immediately by handleBlur when onEdit returns false; and otherwise by `skipExpiry`, a timer
+  // on the next macrotask. React flushes a discrete event's (blur's) state updates before the
+  // next macrotask (see CanvasPreview.test.tsx), so a real self-edit render always sees the
+  // flag first; if no render comes, it simply expires.
   const skipRebuild = useRef(false);
+  const skipExpiry = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (skipExpiry.current !== null) clearTimeout(skipExpiry.current);
+    },
+    [],
+  );
 
   // Replaces the container's HTML manually (instead of dangerouslySetInnerHTML) so an
   // *external* re-render (undo, regenerate, loading another page, toggling Edit text) doesn't
@@ -164,9 +182,21 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit }:
         // Call onEdit synchronously (a click on Copy HTML/Undo/Export right after typing must
         // see this edit, and those read savedRef/state that onEdit's caller updates). Mark this
         // as a self-originated change first, so the layout effect above skips rebuilding the
-        // DOM for it - see the comment on `skipRebuild` for why.
+        // DOM for it - see the comment on `skipRebuild` for why and how it's cleared.
         skipRebuild.current = true;
-        onEdit(path, value);
+        if (skipExpiry.current !== null) clearTimeout(skipExpiry.current);
+        skipExpiry.current = null;
+        if (onEdit(path, value)) {
+          skipExpiry.current = setTimeout(() => {
+            skipExpiry.current = null;
+            skipRebuild.current = false;
+          }, 0);
+        } else {
+          // Rejected: nothing will re-render for it, so drop the flag now and put back what
+          // was there before, so the DOM doesn't show text that isn't in the page.
+          skipRebuild.current = false;
+          if (focusHtml.current !== null) target.innerHTML = focusHtml.current;
+        }
       }
     }
     focusValue.current = null;

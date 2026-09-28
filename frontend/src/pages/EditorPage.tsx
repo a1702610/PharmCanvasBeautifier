@@ -140,30 +140,26 @@ export default function EditorPage() {
     }
   }
 
-  async function handleEdit(path: string, value: string) {
+  // Synchronous (CanvasPreview needs the result right away): returns false if the edit couldn't
+  // be applied, so the preview reverts the element. persist() updates state optimistically
+  // before its first await, so an accepted edit is already in `saved` when this returns;
+  // a later IndexedDB failure is reported and reconciled by persist() itself.
+  function handleEdit(path: string, value: string): boolean {
     const base = savedRef.current ?? current;
-    let nextPage;
+    let next: SavedPage;
     try {
-      nextPage = setAtPath(base.page, path, value);
+      const nextPage = setAtPath(base.page, path, value);
+      const tabMatch = path.match(/^tabs\.(\d+)\./);
+      const tabIndex = tabMatch ? Number(tabMatch[1]) : -1;
+      const tab = base.page.tabs[tabIndex];
+      // Tab edits go through replaceTab so they get an undo-history entry; intro edits don't.
+      next = tab ? replaceTab(base, tab.id, nextPage.tabs[tabIndex]) : { ...base, page: nextPage };
     } catch {
       toast.error("Couldn't save that edit.");
-      return;
+      return false;
     }
-    const tabMatch = path.match(/^tabs\.(\d+)\./);
-    try {
-      if (tabMatch) {
-        const tabIndex = Number(tabMatch[1]);
-        const tab = base.page.tabs[tabIndex];
-        const updatedTab = nextPage.tabs[tabIndex];
-        if (tab) {
-          await persist(replaceTab(base, tab.id, updatedTab));
-          return;
-        }
-      }
-      await persist({ ...base, page: nextPage });
-    } catch {
-      toast.error("Couldn't save that edit.");
-    }
+    persist(next).catch(() => toast.error("Couldn't save that edit."));
+    return true;
   }
 
   const historyCounts = Object.fromEntries(Object.entries(current.history).map(([k, v]) => [k, v.length]));
