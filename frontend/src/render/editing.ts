@@ -2,8 +2,20 @@ import type { Page } from "../types/page";
 
 const BLOCK_TAGS = new Set(["P", "DIV"]);
 
+/** Converts a stray U+00A0 to a normal space, except between a digit and a following
+ *  letter/unit (e.g. "4 mg"), where it's meaningful and kept as-is. */
+function normalizeNbsp(s: string): string {
+  return s.replace(/ /g, (_match, offset: number, str: string) => {
+    const before = str[offset - 1];
+    const after = str[offset + 1];
+    return before && /\d/.test(before) && after && /[A-Za-z]/.test(after) ? " " : " ";
+  });
+}
+
 function collapseWhitespace(s: string): string {
-  return s.replace(/[ \t\n\r]+/g, " ").trim();
+  return normalizeNbsp(s)
+    .replace(/[ \t\n\r]+/g, " ")
+    .trim();
 }
 
 function childrenInline(el: Element): string {
@@ -40,19 +52,37 @@ function inlineToMarkdown(node: Node): string {
  * editing" section of callouts-spec.md:
  *   - <strong>/<b> -> **...**, <em>/<i> -> *...*, <a href="https://..."> -> [text](url)
  *   - <br> -> a single space
- *   - multiple top-level <p>/<div> blocks (a multi-paragraph table cell) -> joined by "\n\n"
+ *   - top-level content is split into paragraphs at each <p>/<div> child (a multi-paragraph
+ *     table cell, or lines a browser wrapped in <div>s on Enter/paste), joined by "\n\n";
+ *     runs of plain inline content between/around those block children form their own
+ *     paragraph too, so nothing typed before/after a block child is lost
  *   - any other tag is dropped, its text content kept
- *   - whitespace is collapsed and the result trimmed
+ *   - a stray U+00A0 becomes a normal space (except between a digit and a unit)
+ *   - whitespace is collapsed and each paragraph trimmed; empty paragraphs are dropped
  */
 export function htmlToMarkdown(el: Element): string {
-  const blockChildren = Array.from(el.children).filter((c) => BLOCK_TAGS.has(c.tagName));
-  if (blockChildren.length > 0) {
-    return blockChildren
-      .map((p) => collapseWhitespace(childrenInline(p)))
-      .filter((s) => s.length > 0)
-      .join("\n\n");
+  const paragraphs: string[] = [];
+  let pending: Node[] = [];
+
+  const flushPending = () => {
+    if (pending.length === 0) return;
+    const text = collapseWhitespace(pending.map(inlineToMarkdown).join(""));
+    if (text) paragraphs.push(text);
+    pending = [];
+  };
+
+  for (const node of Array.from(el.childNodes)) {
+    if (node.nodeType === Node.ELEMENT_NODE && BLOCK_TAGS.has((node as Element).tagName)) {
+      flushPending();
+      const text = collapseWhitespace(childrenInline(node as Element));
+      if (text) paragraphs.push(text);
+    } else {
+      pending.push(node);
+    }
   }
-  return collapseWhitespace(childrenInline(el));
+  flushPending();
+
+  return paragraphs.join("\n\n");
 }
 
 function setRec(obj: unknown, segments: string[], value: string): unknown {
@@ -87,4 +117,10 @@ function setRec(obj: unknown, segments: string[], value: string): unknown {
 export function setAtPath(page: Page, path: string, value: string): Page {
   if (!path) throw new Error("Invalid path");
   return setRec(page, path.split("."), value) as Page;
+}
+
+/** Collapses hard line breaks in pasted/dropped plain text to a single space, since a
+ *  [data-edit] element must stay a single logical field (Enter is blocked; see CanvasPreview). */
+export function collapseNewlines(s: string): string {
+  return s.replace(/\s*[\r\n]+\s*/g, " ");
 }

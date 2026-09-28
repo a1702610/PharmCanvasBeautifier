@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useParams } from "react-router-dom";
 import { getApiErrorMessage } from "../api/client";
@@ -30,8 +30,14 @@ export default function EditorPage() {
   const [regenBusy, setRegenBusy] = useState(false);
   const [tipOpen, setTipOpen] = useState(false);
 
+  // Mirrors `saved`, but written synchronously (not via a render/effect) wherever we change
+  // it, so a handler that fires right after another one just saved (e.g. Copy/Undo clicked in
+  // the same browser event batch as a field's blur-triggered save) reads the up-to-date page
+  // even before React has re-rendered with the new state.
+  const savedRef = useRef<SavedPage | null | undefined>(saved);
+
   useEffect(() => {
-    if (id) getPage(id).then((p) => setSaved(p ?? null)).catch(() => setSaved(null));
+    if (id) getPage(id).then((p) => { savedRef.current = p ?? null; setSaved(p ?? null); }).catch(() => { savedRef.current = null; setSaved(null); });
   }, [id]);
 
   const html = useMemo(
@@ -62,12 +68,32 @@ export default function EditorPage() {
   const current = saved;
 
   async function persist(next: SavedPage) {
-    setSaved(await savePage(next));
+    // Optimistic: update state (and the ref, synchronously) immediately, so the UI and any
+    // handler reading savedRef right away sees the edit without waiting on IndexedDB latency.
+    savedRef.current = next;
+    setSaved(next);
+    try {
+      const stored = await savePage(next);
+      savedRef.current = stored;
+      setSaved(stored);
+    } catch {
+      toast.error("Couldn't save your change.");
+      try {
+        const reloaded = (await getPage(next.id)) ?? null;
+        savedRef.current = reloaded;
+        setSaved(reloaded);
+      } catch {
+        savedRef.current = null;
+        setSaved(null);
+      }
+    }
   }
 
   async function copyHtml() {
+    const page = savedRef.current ?? current;
+    const freshHtml = renderPage(page.page, buildContext(page.images, page.embeds));
     try {
-      await navigator.clipboard.writeText(html);
+      await navigator.clipboard.writeText(freshHtml);
     } catch {
       toast.error("Couldn't copy. Switch to the HTML view and copy it manually.");
       return;
@@ -115,9 +141,10 @@ export default function EditorPage() {
   }
 
   async function handleEdit(path: string, value: string) {
+    const base = savedRef.current ?? current;
     let nextPage;
     try {
-      nextPage = setAtPath(current.page, path, value);
+      nextPage = setAtPath(base.page, path, value);
     } catch {
       toast.error("Couldn't save that edit.");
       return;
@@ -126,14 +153,14 @@ export default function EditorPage() {
     try {
       if (tabMatch) {
         const tabIndex = Number(tabMatch[1]);
-        const tab = current.page.tabs[tabIndex];
+        const tab = base.page.tabs[tabIndex];
         const updatedTab = nextPage.tabs[tabIndex];
         if (tab) {
-          await persist(replaceTab(current, tab.id, updatedTab));
+          await persist(replaceTab(base, tab.id, updatedTab));
           return;
         }
       }
-      await persist({ ...current, page: nextPage });
+      await persist({ ...base, page: nextPage });
     } catch {
       toast.error("Couldn't save that edit.");
     }
@@ -163,7 +190,7 @@ export default function EditorPage() {
             historyCounts={historyCounts}
             onSelect={(i) => { setActiveIndex(i); setView("preview"); }}
             onRegenerate={setRegenTarget}
-            onUndo={(tab) => persist(undoTab(current, tab.id)).catch(() => toast.error("Couldn't undo."))}
+            onUndo={(tab) => persist(undoTab(savedRef.current ?? current, tab.id)).catch(() => toast.error("Couldn't undo."))}
           />
           <NotesPanel notes={current.page.notes} />
         </div>

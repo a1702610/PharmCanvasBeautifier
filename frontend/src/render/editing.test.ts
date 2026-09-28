@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import type { Page } from "../types/page";
-import { htmlToMarkdown, setAtPath } from "./editing";
+import { collapseNewlines, htmlToMarkdown, setAtPath } from "./editing";
 
 function el(html: string): Element {
   const div = document.createElement("div");
@@ -57,6 +57,37 @@ describe("htmlToMarkdown", () => {
 
   it("drops empty paragraphs produced by editing", () => {
     expect(htmlToMarkdown(el("<p>Depression</p><p></p><p>Anxiety</p>"))).toBe("Depression\n\nAnxiety");
+  });
+
+  it("keeps a run of inline/text content that sits before or after a block child, instead of dropping it", () => {
+    // Browsers turn a second line typed after Enter into a <div>, leaving the first line as a
+    // bare text node sibling. Both must survive as their own paragraphs.
+    expect(htmlToMarkdown(el("Hello line1<div>line2</div>"))).toBe("Hello line1\n\nline2");
+    expect(htmlToMarkdown(el("<div>line1</div>line2"))).toBe("line1\n\nline2");
+    expect(htmlToMarkdown(el("start<div>middle</div>end"))).toBe("start\n\nmiddle\n\nend");
+    expect(htmlToMarkdown(el("<strong>Bold</strong> lead-in<div>second line</div>"))).toBe(
+      "**Bold** lead-in\n\nsecond line",
+    );
+  });
+
+  it("converts a stray non-breaking space to a normal space", () => {
+    expect(htmlToMarkdown(el("Take home dose"))).toBe("Take home dose");
+  });
+
+  it("keeps a non-breaking space between a digit and a unit", () => {
+    expect(htmlToMarkdown(el("Maximum 4 g per day"))).toBe("Maximum 4 g per day");
+  });
+});
+
+describe("collapseNewlines", () => {
+  it("collapses hard line breaks in pasted/dropped text to a single space", () => {
+    expect(collapseNewlines("Line one\nLine two")).toBe("Line one Line two");
+    expect(collapseNewlines("Line one\r\nLine two\r\nLine three")).toBe("Line one Line two Line three");
+    expect(collapseNewlines("Line one\n\n\nLine two")).toBe("Line one Line two");
+  });
+
+  it("leaves single-line text untouched", () => {
+    expect(collapseNewlines("Take with food.")).toBe("Take with food.");
   });
 });
 

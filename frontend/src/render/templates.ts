@@ -179,7 +179,8 @@ export function blockLines(block: Block, ctx: RenderContext, path?: string): str
       ];
     case "caution": {
       const open = `<div style="${callout("#f59e0b", "#fffbeb")}"><strong${editAttr(ctx, path && `${path}.title`)} style="color: #b45309;">${renderInline(block.title)}</strong>`;
-      const bodySpan = editSpan(ctx, path && `${path}.body`, renderInline(block.body ?? ""));
+      const bodyPath = block.body !== undefined ? path && `${path}.body` : undefined;
+      const bodySpan = editSpan(ctx, bodyPath, renderInline(block.body ?? ""));
       if (!block.items?.length) return [`${open}<br />${bodySpan}</div>`];
       const head = block.body ? `${open}<br />${bodySpan}` : open;
       return [head, ...indent(listLines(block.items, false, ctx, path && `${path}.items`, "margin: 8px 0 0 0;")), "</div>"];
@@ -247,7 +248,8 @@ export function blockLines(block: Block, ctx: RenderContext, path?: string): str
     case "critical": {
       const titlePath = block.title !== undefined ? path && `${path}.title` : undefined;
       const open = `<div style="${callout("#dc2626", "#fef2f2")}"><strong${editAttr(ctx, titlePath)} style="color: #b91c1c;">${renderInline(block.title ?? "Critical safety warning")}</strong>`;
-      const bodySpan = editSpan(ctx, path && `${path}.body`, renderInline(block.body ?? ""));
+      const bodyPath = block.body !== undefined ? path && `${path}.body` : undefined;
+      const bodySpan = editSpan(ctx, bodyPath, renderInline(block.body ?? ""));
       if (!block.items?.length) return [`${open}<br />${bodySpan}</div>`];
       const head = block.body ? `${open}<br />${bodySpan}` : open;
       return [head, ...indent(listLines(block.items, false, ctx, path && `${path}.items`, "margin: 8px 0 0 0;")), "</div>"];

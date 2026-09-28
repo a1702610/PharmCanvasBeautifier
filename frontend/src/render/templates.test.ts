@@ -335,6 +335,15 @@ describe("block templates: inline editing (editable context)", () => {
     expect(html).toContain('<span data-edit="tabs.0.blocks.7.body">Refer urgently.</span>');
   });
 
+  it("caution/critical with no body field get no data-edit span for body (there's no path to point at)", () => {
+    const caution = renderEditable({ type: "caution", title: "Consider:", items: ["Item"] }, "tabs.0.blocks.7");
+    expect(caution).not.toContain("data-edit=\"tabs.0.blocks.7.body\"");
+    expect(caution).not.toContain("<span data-edit");
+    const critical = renderEditable({ type: "critical", items: ["Item"] }, "tabs.0.blocks.12");
+    expect(critical).not.toContain("data-edit=\"tabs.0.blocks.12.body\"");
+    expect(critical).not.toContain("<span data-edit");
+  });
+
   it("figure caption gets data-edit, alt and placeholder do not", () => {
     const html = renderEditable({ type: "figure", ref: "IMG-01", alt: "Opioid ladder", caption: "AMH Online" }, "tabs.0.blocks.8");
     expect(html).not.toContain('data-edit="tabs.0.blocks.8.alt"');
