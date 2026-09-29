@@ -198,7 +198,7 @@ Every tab ends with exactly one of these, immediately followed by the check-your
 ```html
 <div style="border: 1px solid #1e3a5f; border-radius: 6px; margin: 16px 0; overflow: hidden;">
     <div style="background-color: #1e3a5f; color: #ffffff; padding: 8px 16px; font-weight: bold;">Key takeaways</div>
-    <ul style="margin: 12px 16px 12px 0;">
+    <ul style="margin: 12px 16px 12px 0; padding-left: 40px;">
         <li>POINT</li>
     </ul>
 </div>

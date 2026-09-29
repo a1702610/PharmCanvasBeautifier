@@ -215,7 +215,7 @@ export function blockLines(block: Block, ctx: RenderContext, path?: string): str
         `<div style="border: 1px solid ${NAVY}; border-radius: 6px; margin: 16px 0; overflow: hidden;">`,
         ...indent([
           `<div style="background-color: ${NAVY}; color: #ffffff; padding: 8px 16px; font-weight: bold;">Key takeaways</div>`,
-          ...listLines(block.items, false, ctx, path && `${path}.items`, "margin: 12px 16px 12px 0;"),
+          ...listLines(block.items, false, ctx, path && `${path}.items`, "margin: 12px 16px 12px 0; padding-left: 40px;"),
         ]),
         "</div>",
       ];
