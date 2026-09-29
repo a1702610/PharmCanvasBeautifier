@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.config import settings
+from app.config import Settings, settings
 from app.main import app
 
 
@@ -14,3 +14,8 @@ def test_settings_defaults():
     assert settings.MAX_SOURCES == 5
     assert settings.max_file_bytes == 25 * 1024 * 1024
     assert "http://localhost:5173" in settings.allowed_origins_list
+
+
+def test_allowed_origins_ignore_trailing_slashes_and_spaces():
+    s = Settings(ALLOWED_ORIGINS=" https://pharmcanvas.vercel.app/ , http://localhost:5173 ")
+    assert s.allowed_origins_list == ["https://pharmcanvas.vercel.app", "http://localhost:5173"]

@@ -13,7 +13,8 @@ class Settings(BaseSettings):
 
     @property
     def allowed_origins_list(self) -> list[str]:
-        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+        # Browsers send Origin without a trailing slash, so normalise pasted URLs.
+        return [o.strip().rstrip("/") for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
 
     @property
     def max_file_bytes(self) -> int:

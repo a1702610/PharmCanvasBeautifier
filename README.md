@@ -27,8 +27,17 @@ Double-click `setup.bat` once, then `start.bat` each time. The app opens at http
 
 ## Deploying (maintainers)
 
-- **Backend (Render):** New → Blueprint → this repo (uses `render.yaml`). Set `ALLOWED_ORIGINS` to the Vercel URL.
-- **Frontend (Vercel):** import the repo with root directory `frontend`. Set `VITE_API_BASE_URL` to the Render URL.
+Each side needs the other's address, so do it in this order:
+
+1. **Backend on Render.** In the Render dashboard: **New → Blueprint**, pick this repository (it uses `render.yaml`). When asked for `ALLOWED_ORIGINS`, enter `http://localhost:5173` for now. Wait for the deploy to finish, then open `https://<your-service>.onrender.com/api/health`. It should show `{"status":"ok"}` (the first load can take up to a minute while the free server wakes up).
+2. **Frontend on Vercel.** **Add New → Project**, import this repository, set **Root Directory** to `frontend` (Vercel detects Vite). Under **Environment Variables** add `VITE_API_BASE_URL` = your Render address, e.g. `https://pharm-canvas-backend.onrender.com`. Deploy. Note: this value is baked in when the site is built, so if you change it later you must redeploy.
+3. **Connect them.** Back in Render → your service → **Environment**, set `ALLOWED_ORIGINS` to your Vercel address, e.g. `https://pharmcanvas.vercel.app` (add more, comma-separated, if needed). Save; Render redeploys.
+4. **Check.** Open the Vercel address, add your Gemini key, and generate a page.
+
+Notes:
+- No Gemini key is needed on Render; each lecturer adds their own in the browser.
+- Vercel "preview" deployments get different addresses; they will only reach the backend if you add those addresses to `ALLOWED_ORIGINS` too. Use the main production address for colleagues.
+- On the free plan Render sleeps after 15 minutes idle; the app shows "Waking up the server" while it starts.
 
 ## Development
 
