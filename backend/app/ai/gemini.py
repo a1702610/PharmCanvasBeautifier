@@ -75,7 +75,6 @@ async def generate_structured(
         system_instruction=system_prompt,
         response_mime_type="application/json",
         response_schema=schema,
-        temperature=1.0,
         max_output_tokens=65536,
         thinking_config=types.ThinkingConfig(thinking_level="low"),
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
