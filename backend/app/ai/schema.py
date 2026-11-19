@@ -18,12 +18,21 @@ class Note(BaseModel):
 
 # ── Wire format (Gemini response schema) ─────────────────────────────────────
 
+InnerBlockType = Literal[
+    "heading", "paragraph", "list", "table", "contrast_table", "clinical",
+    "caution", "evidence", "citation", "link", "figure",
+    "takeaways", "self_check", "counselling", "tip", "critical",
+    "key_point", "flow", "formula",
+]
 BlockType = Literal[
     "heading", "paragraph", "list", "table", "contrast_table", "clinical",
     "caution", "evidence", "citation", "link", "figure",
     "takeaways", "self_check", "counselling", "tip", "critical",
+    "key_point", "flow", "formula", "accordion",
 ]
 ChildType = Literal["paragraph", "list", "figure", "citation", "references"]
+FlowStyle = Literal["solid", "outline", "amber"]
+TableVariant = Literal["primary", "secondary"]
 
 
 class WireChild(BaseModel):
@@ -40,18 +49,30 @@ class WireQuestion(BaseModel):
     answer: str | None = None
 
 
-class WireBlock(BaseModel):
-    type: BlockType
+class WireFlowStep(BaseModel):
+    label: str | None = None
+    sub: str | None = None
+    style: FlowStyle | None = None
+
+
+class WireFlow(BaseModel):
+    steps: list[WireFlowStep] | None = None
+
+
+class WireBlockBase(BaseModel):
     text: str | None = None
     ordered: bool | None = None
     items: list[str] | None = None
     headers: list[str] | None = None
     col_widths: list[float] | None = None
     rows: list[list[str]] | None = None
+    variant: TableVariant | None = None
+    row_headers: bool | None = None
     left_header: str | None = None
     right_header: str | None = None
     body: str | None = None
     title: str | None = None
+    lead: str | None = None
     children: list[WireChild] | None = None
     lead_in: str | None = None
     url: str | None = None
@@ -60,6 +81,23 @@ class WireBlock(BaseModel):
     alt: str | None = None
     caption: str | None = None
     questions: list[WireQuestion] | None = None
+    steps: list[WireFlowStep] | None = None
+    expression: str | None = None
+    note: str | None = None
+
+
+class WireInnerBlock(WireBlockBase):
+    type: InnerBlockType
+
+
+class WirePanel(BaseModel):
+    title: str | None = None
+    blocks: list[WireInnerBlock] = Field(default_factory=list)
+
+
+class WireBlock(WireBlockBase):
+    type: BlockType
+    panels: list[WirePanel] | None = None
 
 
 class WireTab(BaseModel):
@@ -70,13 +108,29 @@ class WireTab(BaseModel):
 class WireRevision(BaseModel):
     include: bool = False
     embed_ref: str | None = None
+    points: list[str] | None = None
+    flow_title: str | None = None
+    flow: WireFlow | None = None
+
+
+class WireActivity(BaseModel):
+    task: str | None = None
+    purpose: str | None = None
+
+
+class WireFigureRef(BaseModel):
+    ref: str | None = None
+    alt: str | None = None
+    caption: str | None = None
 
 
 class WirePage(BaseModel):
     title: str
     intro: list[str]
+    intro_figure: WireFigureRef | None = None
     tabs: list[WireTab]
     revision: WireRevision = Field(default_factory=WireRevision)
+    study_activities: list[WireActivity] | None = None
     notes: list[Note] = Field(default_factory=list)
 
 
@@ -103,6 +157,8 @@ class Table(BaseModel):
     headers: list[str]
     col_widths: list[float] | None = None
     rows: list[list[str]]
+    variant: Literal["primary", "secondary"] | None = None
+    row_headers: bool | None = None
 
 
 class ContrastTable(BaseModel):
@@ -181,6 +237,29 @@ class Critical(BaseModel):
     items: list[str] | None = None
 
 
+class KeyPoint(BaseModel):
+    type: Literal["key_point"] = "key_point"
+    lead: str | None = None
+    text: str
+
+
+class FlowStep(BaseModel):
+    label: str
+    sub: str | None = None
+    style: Literal["solid", "outline", "amber"] = "outline"
+
+
+class Flow(BaseModel):
+    type: Literal["flow"] = "flow"
+    steps: list[FlowStep]
+
+
+class Formula(BaseModel):
+    type: Literal["formula"] = "formula"
+    expression: str
+    note: str | None = None
+
+
 EvidenceChild = Annotated[
     Union[Paragraph, ListBlock, Figure, Citation, References],
     Field(discriminator="type"),
@@ -193,10 +272,30 @@ class Evidence(BaseModel):
     children: list[EvidenceChild]
 
 
+InnerBlock = Annotated[
+    Union[Heading, Paragraph, ListBlock, Table, ContrastTable, Clinical,
+          Caution, Evidence, Citation, Link, Figure,
+          Takeaways, SelfCheck, Counselling, Tip, Critical,
+          KeyPoint, Flow, Formula],
+    Field(discriminator="type"),
+]
+
+
+class Panel(BaseModel):
+    title: str
+    blocks: list[InnerBlock]
+
+
+class Accordion(BaseModel):
+    type: Literal["accordion"] = "accordion"
+    panels: list[Panel]
+
+
 Block = Annotated[
     Union[Heading, Paragraph, ListBlock, Table, ContrastTable, Clinical,
           Caution, Evidence, Citation, Link, Figure,
-          Takeaways, SelfCheck, Counselling, Tip, Critical],
+          Takeaways, SelfCheck, Counselling, Tip, Critical,
+          KeyPoint, Flow, Formula, Accordion],
     Field(discriminator="type"),
 ]
 
@@ -210,11 +309,21 @@ class Tab(BaseModel):
 class Revision(BaseModel):
     include: bool = False
     embed_ref: str | None = None
+    points: list[str] | None = None
+    flow_title: str | None = None
+    flow: Flow | None = None
+
+
+class StudyActivity(BaseModel):
+    task: str
+    purpose: str
 
 
 class Page(BaseModel):
     title: str
     intro: list[str]
+    intro_figure: Figure | None = None
     tabs: list[Tab]
     revision: Revision
+    study_activities: list[StudyActivity] | None = None
     notes: list[Note]

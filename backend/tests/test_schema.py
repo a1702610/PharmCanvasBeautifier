@@ -112,3 +112,54 @@ def test_typed_counselling_title_defaults_to_none():
         "notes": [],
     })
     assert page.tabs[0].blocks[0].title is None
+
+
+from app.ai.schema import (
+    Accordion, Flow, Formula, KeyPoint, Page, WireBlock, WireInnerBlock, WirePage,
+)
+
+
+def test_wire_page_accepts_accordion_flow_formula_and_page_fields():
+    wire = WirePage.model_validate({
+        "title": "T", "intro": ["i"],
+        "intro_figure": {"ref": "IMG-01", "alt": "Map"},
+        "study_activities": [{"task": "Watch part 1", "purpose": "Framework"}],
+        "revision": {"include": False, "points": ["A", "B"], "flow_title": "Direction",
+                     "flow": {"steps": [{"label": "CL"}, {"label": "k", "style": "amber"}]}},
+        "tabs": [{"title": "One", "blocks": [
+            {"type": "key_point", "lead": "Distribution is reversible.", "text": "Drug moves back."},
+            {"type": "flow", "steps": [{"label": "Dose", "style": "solid"}, {"label": "Effect", "sub": "PD"}]},
+            {"type": "formula", "expression": "CL = Q × E", "note": "Q = blood flow"},
+            {"type": "table", "headers": ["A", "B"], "rows": [["1", "2"]], "variant": "secondary", "row_headers": False},
+            {"type": "accordion", "panels": [{"title": "Worked example", "blocks": [
+                {"type": "paragraph", "text": "Step 1"},
+            ]}]},
+        ]}],
+    })
+    assert wire.tabs[0].blocks[4].panels[0].blocks[0].text == "Step 1"
+    assert wire.revision.flow.steps[1].style == "amber"
+    assert wire.intro_figure.ref == "IMG-01"
+
+
+def test_inner_block_type_excludes_accordion():
+    import pydantic, pytest
+    with pytest.raises(pydantic.ValidationError):
+        WireInnerBlock.model_validate({"type": "accordion"})
+    WireBlock.model_validate({"type": "accordion", "panels": []})
+
+
+def test_typed_page_round_trips_new_blocks():
+    page = Page.model_validate({
+        "title": "T", "intro": [], "notes": [],
+        "revision": {"include": False, "points": ["p"], "flow": {"steps": [{"label": "a"}, {"label": "b"}]}},
+        "tabs": [{"id": "t1", "title": "x", "blocks": [
+            {"type": "key_point", "text": "t"},
+            {"type": "flow", "steps": [{"label": "a", "style": "solid"}, {"label": "b"}]},
+            {"type": "formula", "expression": "e"},
+            {"type": "accordion", "panels": [{"title": "p", "blocks": [{"type": "formula", "expression": "f"}]}]},
+        ]}],
+    })
+    b = page.tabs[0].blocks
+    assert isinstance(b[0], KeyPoint) and isinstance(b[1], Flow) and isinstance(b[2], Formula) and isinstance(b[3], Accordion)
+    assert isinstance(b[3].panels[0].blocks[0], Formula)
+    assert b[1].steps[1].style == "outline"
