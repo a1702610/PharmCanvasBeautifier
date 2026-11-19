@@ -13,7 +13,7 @@ const DASHED = `display: inline-block; padding: 10px 16px; border: 2px dashed ${
 export function studyMaterialsContentLines(page: Page, ctx: RenderContext): string[] {
   const study = page.study ?? { recordings: [], resources: [] };
   const recs = study.recordings ?? [];
-  const ress = (study.resources ?? []).filter((r) => r?.title?.trim());
+  const ress = (study.resources ?? []).filter((r) => r?.title?.trim() || safeUrl(r?.url));
   const out: string[] = [];
 
   const activities = page.study_activities ?? [];
@@ -84,7 +84,8 @@ export function studyMaterialsContentLines(page: Page, ctx: RenderContext): stri
   const resources = ress.length
     ? ress.map((res) => {
         const url = safeUrl(res.url);
-        return `<p>${url ? link(url, escapeText(res.title)) : escapeText(res.title)}</p>`;
+        const text = res.title?.trim() || url || "";
+        return `<p>${url ? link(url, escapeText(text)) : escapeText(text)}</p>`;
       })
     : ["<p>[Add additional resources]</p>"];
   out.push(

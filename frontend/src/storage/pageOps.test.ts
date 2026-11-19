@@ -86,3 +86,20 @@ describe("sourceNotes", () => {
     expect(sourceNotes([{ name: "a.pdf", kind: "pdf", ok: true, warnings: [] }])).toEqual([]);
   });
 });
+
+describe("usedImageRefs nesting", () => {
+  it("finds refs inside accordion panels, evidence children and the intro figure", () => {
+    const p = {
+      ...page,
+      intro_figure: { type: "figure", ref: "IMG-00", alt: "a" },
+      tabs: [{
+        id: "t", title: "t",
+        blocks: [{ type: "accordion", panels: [{ title: "p", blocks: [
+          { type: "figure", ref: "IMG-01", alt: "a" },
+          { type: "evidence", title: "e", children: [{ type: "figure", ref: "IMG-02", alt: "a" }] },
+        ] }] }],
+      }],
+    } as unknown as Page;
+    expect(usedImageRefs(p)).toEqual(["IMG-00", "IMG-01", "IMG-02"]);
+  });
+});

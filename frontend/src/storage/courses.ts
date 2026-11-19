@@ -57,7 +57,7 @@ export function exportCourseJson(c: Course): string {
 export function parseImportedCourse(json: string): Course {
   let data: { format?: string; version?: number; course?: Record<string, unknown> };
   try { data = JSON.parse(json); } catch { throw new Error(INVALID); }
-  if (data?.format !== FORMAT || data.version !== 1 || !data.course || typeof data.course !== "object") throw new Error(INVALID);
+  if (data?.format !== FORMAT || data.version !== 1 || !data.course || typeof data.course !== "object" || Array.isArray(data.course)) throw new Error(INVALID);
   const out = newCourse();
   for (const f of FIELDS) {
     const v = data.course[f];

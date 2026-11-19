@@ -37,7 +37,10 @@ export default function CreatePage() {
   const busy = stage !== "idle";
 
   const loadCourses = useCallback(() => {
-    listCourses().then(setCourses).catch(() => toast.error("Couldn't load your courses."));
+    listCourses().then((list) => {
+      setCourses(list);
+      setCourseId((id) => (list.some((c) => c.id === id) ? id : ""));
+    }).catch(() => toast.error("Couldn't load your courses."));
   }, []);
   useEffect(loadCourses, [loadCourses]);
 

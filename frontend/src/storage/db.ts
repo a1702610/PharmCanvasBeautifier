@@ -1,3 +1,4 @@
+import toast from "react-hot-toast";
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { EmbedInfo, ImageInfo } from "../types/api";
 import type { Page, Tab } from "../types/page";
@@ -36,6 +37,16 @@ export function db(): Promise<IDBPDatabase<Schema>> {
       if (oldVersion < 1) database.createObjectStore("pages", { keyPath: "id" });
       if (oldVersion < 2) database.createObjectStore("courses", { keyPath: "id" });
     },
+    blocked() {
+      toast.error("Close other PharmCanvas tabs to finish updating.");
+    },
+    blocking() {
+      dbPromise?.then((d) => d.close()).catch(() => undefined);
+      dbPromise = null;
+    },
+  }).catch((e) => {
+    dbPromise = null;
+    throw e;
   });
   return dbPromise;
 }

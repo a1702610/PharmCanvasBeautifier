@@ -7,7 +7,11 @@ import { contentLines, figureLines, flowRowLines, indent, PALETTE as P, PLACEHOL
 export const TABS_CLASS = "dp-panels-wrapper dp-tabs-buttons-vertical";
 
 export function buildContext(images: ImageInfo[], embeds: EmbedInfo[], editable = false): RenderContext {
-  return { images: Object.fromEntries(images.map((i) => [i.ref, i])), embeds: Object.fromEntries(embeds.map((e) => [e.ref, e.html])), editable };
+  const imageMap: Record<string, ImageInfo> = Object.create(null);
+  for (const i of images) imageMap[i.ref] = i;
+  const embedMap: Record<string, string> = Object.create(null);
+  for (const e of embeds) embedMap[e.ref] = e.html;
+  return { images: imageMap, embeds: embedMap, editable };
 }
 
 const edit = (ctx: RenderContext, path: string) => (ctx.editable ? ` data-edit="${escapeAttr(path)}"` : "");

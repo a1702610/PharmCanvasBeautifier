@@ -135,3 +135,18 @@ describe("parseImportedPage", () => {
     expect(cleaned.page.intro_figure).toBeUndefined();
   });
 });
+
+describe("parseImportedPage study/revision normalisation", () => {
+  it("drops malformed study rows and revision points without throwing at render", async () => {
+    const { renderPage, buildContext } = await import("../render/renderPage");
+    const bad = {
+      ...page,
+      study: { handout: { label: 5, url: "https://x.test" }, recordings: [null, { part: 3, title: "T" }], resources: [{ url: "https://y" }, "s", { title: "R" }] },
+      revision: { include: false, points: "x" },
+    };
+    const out = parseImportedPage(wrap({ ...saved, page: bad }));
+    expect(out.page.study).toEqual({ handout: { url: "https://x.test" }, recordings: [{ title: "T" }], resources: [{ title: "R" }] });
+    expect(out.page.revision.points).toBeUndefined();
+    expect(() => renderPage(out.page, buildContext([], []))).not.toThrow();
+  });
+});

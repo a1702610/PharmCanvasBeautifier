@@ -130,11 +130,7 @@ export default function EditorPage() {
   async function saveStudy() {
     const base = savedRef.current ?? current;
     setStudyOpen(false);
-    try {
-      await persist({ ...base, page: { ...base.page, study: studyDraft } });
-    } catch {
-      toast.error("Couldn't save study materials.");
-    }
+    await persist({ ...base, page: { ...base.page, study: studyDraft } });
   }
 
   async function submitRegenerate(instruction: string) {

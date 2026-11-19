@@ -11,7 +11,7 @@ Turns pharmacy lecture material (Word, PowerPoint, PDF, or an old Canvas page) i
    - **Study materials (optional):** open this section to add the handout, recording and transcript links, and any extra resources. You can also do this later with the **Study materials** button in the editor toolbar. Links you leave out show as `[Add … link]` placeholders on the page.
 4. **Review:** pages follow the shared pharmacy template: an intro panel, numbered tabs with collapsible sections, a "Study materials" tab, and a "Revision check". Click through the tabs in the preview. Read **Notes for you**: these are things to check, such as images to upload and content the AI flagged.
 5. **Adjust:** click ⟳ next to a tab to regenerate just that tab with an instruction (for example "make this shorter"). Click ↶ to undo.
-6. **Images:** click **Images ⤓** to download the images the page uses (`IMG-01.png`…). Upload them to Canvas and replace each dashed `[INSERT IMAGE …]` box.
+6. **Images:** click **Images ⤓** to download the images the page uses (`IMG-01.png`…). Upload them to Canvas and replace each dashed `[ IMAGE IMG-nn: … ]` placeholder.
 7. **Copy HTML**, then in Canvas: **Edit** → `</>` (HTML editor) → paste → **Save**.
 
 Pages are saved in your browser under **My pages**. Use **Export** to back one up or send it to a colleague, who can **Import** it.

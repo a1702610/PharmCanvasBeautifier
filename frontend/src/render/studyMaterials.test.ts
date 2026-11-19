@@ -47,11 +47,12 @@ describe("study materials tab", () => {
   });
 
   it("activities table only when supplied, resources as links", () => {
-    const h = html({ study_activities: [{ task: "Watch the recordings", purpose: "Framework" }], study: { recordings: [], resources: [{ title: "ICP", url: "http://www.icp.org.nz/" }, { title: "No link" }] } });
+    const h = html({ study_activities: [{ task: "Watch the recordings", purpose: "Framework" }], study: { recordings: [], resources: [{ title: "ICP", url: "http://www.icp.org.nz/" }, { title: "No link" }, { url: "https://untitled.test/" } as never, { title: " " }] } });
     expect(h).toContain(">What to do</th>");
     expect(h).toContain("<strong>Watch the recordings</strong>");
     expect(h).toContain('<p><a href="http://www.icp.org.nz/" target="_blank" rel="noopener">ICP</a></p>');
     expect(h).toContain("<p>No link</p>");
+    expect(h).toContain('<a href="https://untitled.test/" target="_blank" rel="noopener">https://untitled.test/</a>');
   });
 
   it("tolerates a partially formed study object", () => {
@@ -59,6 +60,8 @@ describe("study materials tab", () => {
     expect(h).toContain("[Add recording link]");
     expect(h).toContain("[Add additional resources]");
     const t = html({ study: { recordings: [], resources: [{ url: "https://x.org" } as never] } });
-    expect(t).toContain("[Add additional resources]");
+    expect(t).toContain(">https://x.org</a>");
+    const n = html({ study: { recordings: [], resources: [{ title: " " }, { url: "javascript:x" } as never] } });
+    expect(n).toContain("[Add additional resources]");
   });
 });

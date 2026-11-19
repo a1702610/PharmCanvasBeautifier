@@ -163,3 +163,8 @@ def test_typed_page_round_trips_new_blocks():
     assert isinstance(b[0], KeyPoint) and isinstance(b[1], Flow) and isinstance(b[2], Formula) and isinstance(b[3], Accordion)
     assert isinstance(b[3].panels[0].blocks[0], Formula)
     assert b[1].steps[1].style == "outline"
+
+
+def test_type_is_first_wire_property():
+    assert list(WireBlock.model_fields)[0] == "type"
+    assert list(WireInnerBlock.model_fields)[0] == "type"

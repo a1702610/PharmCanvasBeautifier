@@ -69,3 +69,13 @@ describe("renderPage", () => {
     expect(html).not.toMatch(/<p data-edit="[^"]*">&nbsp;<\/p>/);
   });
 });
+
+describe("prototype-key refs", () => {
+  it("does not resolve refs like constructor/toString", () => {
+    const c = buildContext([], []);
+    const p: Page = { ...page, tabs: [{ id: "t", title: "T", blocks: [{ type: "figure", ref: "toString", alt: "a" }] }], revision: { include: false, embed_ref: "constructor" } };
+    const html = renderPage(p, c);
+    expect(html).not.toContain("Revision check");
+    expect(html).toContain("[ IMAGE");
+  });
+});

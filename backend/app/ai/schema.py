@@ -60,6 +60,7 @@ class WireFlow(BaseModel):
 
 
 class WireBlockBase(BaseModel):
+    type: BlockType
     text: str | None = None
     ordered: bool | None = None
     items: list[str] | None = None
@@ -87,7 +88,7 @@ class WireBlockBase(BaseModel):
 
 
 class WireInnerBlock(WireBlockBase):
-    type: InnerBlockType
+    type: InnerBlockType  # type: ignore[assignment]
 
 
 class WirePanel(BaseModel):
@@ -96,7 +97,6 @@ class WirePanel(BaseModel):
 
 
 class WireBlock(WireBlockBase):
-    type: BlockType
     panels: list[WirePanel] | None = None
 
 

@@ -1,5 +1,5 @@
 import type { ImageForAI, ImageInfo, SourceStatus } from "../types/api";
-import type { Note, Page, Tab } from "../types/page";
+import type { Block, Note, Page, Tab } from "../types/page";
 import type { SavedPage } from "./db";
 
 export const HISTORY_LIMIT = 5;
@@ -35,14 +35,18 @@ export function usedImageRefs(page: Page): string[] {
   const add = (ref: string) => {
     if (!refs.includes(ref)) refs.push(ref);
   };
-  for (const tab of page.tabs) {
-    for (const block of tab.blocks) {
+  const walk = (blocks: Block[]) => {
+    for (const block of blocks) {
       if (block.type === "figure") add(block.ref);
-      if (block.type === "evidence") {
+      else if (block.type === "evidence") {
         for (const child of block.children) if (child.type === "figure") add(child.ref);
+      } else if (block.type === "accordion") {
+        for (const panel of block.panels) walk(panel.blocks);
       }
     }
-  }
+  };
+  if (page.intro_figure?.ref) add(page.intro_figure.ref);
+  for (const tab of page.tabs) walk(tab.blocks);
   return refs;
 }
 

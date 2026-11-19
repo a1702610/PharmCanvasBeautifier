@@ -41,6 +41,7 @@ describe("course profiles", () => {
     expect(back.code).toBe("A");
     expect(back.id).not.toBe(c.id);
     expect(() => parseImportedCourse('{"format":"pharm-canvas-page"}')).toThrow("This file isn't a course profile.");
+    expect(() => parseImportedCourse('{"format":"pharm-canvas-course","version":1,"course":[]}')).toThrow("This file isn't a course profile.");
     expect(() => parseImportedCourse("nope")).toThrow("This file isn't a course profile.");
   });
 });

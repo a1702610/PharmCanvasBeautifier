@@ -27,6 +27,30 @@ function isTab(v: unknown): v is Tab {
   return typeof t.id === "string" && typeof t.title === "string" && Array.isArray(t.blocks);
 }
 
+const strOnly = (o: Record<string, unknown>, keys: string[]): Record<string, string> => {
+  const out: Record<string, string> = {};
+  for (const k of keys) if (typeof o[k] === "string") out[k] = o[k] as string;
+  return out;
+};
+const isRec = (x: unknown): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x);
+
+function normaliseStudy(st: unknown): Page["study"] {
+  if (!isRec(st) || !Array.isArray(st.recordings) || !Array.isArray(st.resources)) return undefined;
+  const handout = isRec(st.handout) ? strOnly(st.handout, ["label", "url"]) : undefined;
+  return {
+    ...(handout && { handout }),
+    recordings: st.recordings.filter(isRec).map((r) => strOnly(r, ["part", "title", "recording_url", "transcript_url"])),
+    resources: st.resources.filter((r): r is Record<string, unknown> => isRec(r) && typeof r.title === "string").map((r) => strOnly(r, ["title", "url"]) as { title: string; url?: string }),
+  };
+}
+
+function normaliseRevision(rev: unknown): Page["revision"] {
+  if (!isRec(rev)) return { include: false };
+  const r = { ...rev } as Page["revision"] & Record<string, unknown>;
+  if (!isStringArray(r.points)) delete r.points;
+  return r;
+}
+
 function validatePage(v: unknown): Page {
   if (!v || typeof v !== "object") fail();
   const p = v as Partial<Page>;
@@ -48,12 +72,12 @@ function validatePage(v: unknown): Page {
       ? (acts as Page["study_activities"])
       : undefined;
   const st = raw.study;
-  const study = isObj(st) && Array.isArray(st.recordings) && Array.isArray(st.resources) ? (st as unknown as Page["study"]) : undefined;
+  const study = normaliseStudy(st);
   return {
     title: p.title,
     intro: p.intro,
     tabs: p.tabs,
-    revision: p.revision ?? { include: false },
+    revision: normaliseRevision(p.revision),
     notes,
     ...(intro_figure && { intro_figure }),
     ...(study_activities && { study_activities }),
