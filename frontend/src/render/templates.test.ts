@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Block } from "../types/page";
-import { blockLines, contentLines, SPACER, type RenderContext } from "./templates";
+import { blockLines, contentLines, SPACER, withAlt, type RenderContext } from "./templates";
 
 const ctx: RenderContext = {
   images: {
@@ -259,5 +259,66 @@ describe("remaining components", () => {
     expect(kp).toContain('<span data-edit="p.text">T</span>');
     const acc = re({ type: "accordion", panels: [{ title: "P", blocks: [{ type: "paragraph", text: "a" }, { type: "paragraph", text: "b" }] }] }, "p");
     expect(acc).toContain('<p data-edit="p.panels.0.blocks.1.text">b</p>');
+  });
+});
+
+describe("fix round 1 additions", () => {
+  it("paragraph and lists", () => {
+    expect(r({ type: "paragraph", text: "Hello **world**" })).toBe("<p>Hello <strong>world</strong></p>");
+    expect(r({ type: "list", ordered: false, items: ["a", "b"] })).toBe("<ul>\n    <li>a</li>\n    <li>b</li>\n</ul>");
+    expect(r({ type: "list", ordered: true, items: ["a", "b"] })).toBe("<ol>\n    <li>a</li>\n    <li>b</li>\n</ol>");
+  });
+  it("self check with two questions", () => {
+    const html = r({ type: "self_check", questions: [{ question: "Q1?", answer: "A1." }, { question: "Q2?", answer: "A2." }] });
+    expect(html).toContain('<strong>1.</strong> Q1?');
+    expect(html).toContain('<strong>2.</strong> Q2?');
+    expect(html).toContain('<p style="margin: 6px 0 0 0;">A2.</p>');
+    expect(html.match(/<details>/g)).toHaveLength(2);
+  });
+  it("accordion with two panels has no spacer between panel groups", () => {
+    const panel = (t: string) => ({ title: t, blocks: [{ type: "paragraph" as const, text: "x" }] });
+    expect(r({ type: "accordion", panels: [panel("One"), panel("Two")] })).toBe(
+      [
+        '<div class="dp-panels-wrapper dp-accordion-default">',
+        '    <div class="dp-panel-group">',
+        '        <h4 class="dp-panel-heading">One</h4>',
+        '        <div class="dp-panel-content">',
+        "            <p>x</p>",
+        `            ${SPACER}`,
+        "        </div>",
+        "    </div>",
+        '    <div class="dp-panel-group">',
+        '        <h4 class="dp-panel-heading">Two</h4>',
+        '        <div class="dp-panel-content">',
+        "            <p>x</p>",
+        `            ${SPACER}`,
+        "        </div>",
+        "    </div>",
+        "</div>",
+      ].join("\n"),
+    );
+  });
+  it("link with non-http url renders no anchor", () => {
+    const html = r({ type: "link", lead_in: "Open", link_text: "Click", url: "javascript:alert(1)" });
+    expect(html).not.toContain("<a ");
+    expect(html).not.toContain("href");
+    expect(html).toContain("Click");
+  });
+  it("withAlt", () => {
+    expect(withAlt('<img src="x" alt="Good description"/>', "New")).toBe('<img src="x" alt="Good description"/>');
+    expect(withAlt('<img src="x"/>', "New")).toBe('<img alt="New" src="x"/>');
+    expect(withAlt('<img src="x" alt="image.png"/>', "New")).toBe('<img src="x" alt="New"/>');
+  });
+  it("editable: no path means no data-edit", () => {
+    expect(blockLines({ type: "paragraph", text: "a" }, ed).join("")).toBe("<p>a</p>");
+  });
+  it("editable: caution, counselling, figure caption paths", () => {
+    const c = re({ type: "caution", title: "T", body: "B", items: ["i"] }, "p");
+    expect(c).toContain('<strong data-edit="p.title">T</strong>');
+    expect(c).toContain('<span data-edit="p.body">B</span>');
+    expect(c).toContain('<li data-edit="p.items.0">i</li>');
+    expect(re({ type: "counselling", items: ["i"] }, "p")).not.toMatch(/data-edit="p\.title"/);
+    expect(re({ type: "counselling", title: "Custom", items: ["i"] }, "p")).toContain('<strong data-edit="p.title" style="color: #140f50;">Custom</strong>');
+    expect(re({ type: "figure", ref: "IMG-02", alt: "A", caption: "Cap" }, "p")).toContain('data-edit="p.caption"');
   });
 });

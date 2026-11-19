@@ -64,7 +64,7 @@ function cellLines(tag: "td" | "th", style: string, content: string, ctx: Render
 export function simpleTableLines(
   headers: string[],
   rows: string[][],
-  opts: { variant?: "primary" | "secondary"; rowHeaders?: boolean; widths?: (number | undefined)[]; headerPaths?: (string | undefined)[]; cellPath?: (r: number, c: number) => string | undefined; headerWidth?: number },
+  opts: { variant?: "primary" | "secondary"; rowHeaders?: boolean; widths?: (number | undefined)[]; headerPaths?: (string | undefined)[]; cellPath?: (r: number, c: number) => string | undefined },
   ctx: RenderContext,
 ): string[] {
   const secondary = opts.variant === "secondary";
