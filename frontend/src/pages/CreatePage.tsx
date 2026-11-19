@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { getApiErrorMessage } from "../api/client";
@@ -7,12 +7,16 @@ import { Dropzone } from "../components/create/Dropzone";
 import { GenerateProgress, type Stage } from "../components/create/GenerateProgress";
 import { PasteCanvasModal } from "../components/create/PasteCanvasModal";
 import { SourceList } from "../components/create/SourceList";
+import { CourseManagerModal } from "../components/courses/CourseManagerModal";
+import { emptyStudy, StudyMaterialsForm } from "../components/study/StudyMaterialsForm";
 import { Button } from "../components/ui/Button";
 import { checkFile, checkPaste, MAX_SOURCES } from "../config";
 import { useApiKey } from "../hooks/useApiKey";
+import { buildCourseContext, listCourses, type Course } from "../storage/courses";
 import { newSavedPage, savePage } from "../storage/db";
 import { imagesForAI, sourceNotes } from "../storage/pageOps";
 import type { ExtractResult, SourceInput, SourceStatus } from "../types/api";
+import type { StudyMaterials } from "../types/page";
 
 export default function CreatePage() {
   const navigate = useNavigate();
@@ -25,7 +29,17 @@ export default function CreatePage() {
   const [stage, setStage] = useState<Stage>("idle");
   const [pasteOpen, setPasteOpen] = useState(false);
   const [largeExtract, setLargeExtract] = useState<ExtractResult | null>(null);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [courseId, setCourseId] = useState("");
+  const [courseManagerOpen, setCourseManagerOpen] = useState(false);
+  const [study, setStudy] = useState<StudyMaterials>(emptyStudy());
+  const [studyOpen, setStudyOpen] = useState(false);
   const busy = stage !== "idle";
+
+  const loadCourses = useCallback(() => {
+    listCourses().then(setCourses).catch(() => toast.error("Couldn't load your courses."));
+  }, []);
+  useEffect(loadCourses, [loadCourses]);
 
   function addFiles(files: File[]) {
     const next = [...sources];
@@ -90,20 +104,23 @@ export default function CreatePage() {
       }
       setLargeExtract(null);
       setStage("structuring");
+      const course = courses.find((c) => c.id === courseId);
       const { page } = await generatePage({
         text: result.text,
         images: imagesForAI(result.images),
         instructions,
         include_revision: includeRevision,
         title,
-        course_context: "",
+        course_context: buildCourseContext(course),
       });
       setStage("building");
       const notes = sourceNotes(result.sources);
-      const pageWithNotes = notes.length ? { ...page, notes: [...page.notes, ...notes] } : page;
-      const saved = await savePage(
-        newSavedPage({ page: pageWithNotes, sourceText: result.text, images: result.images, embeds: result.embeds }),
-      );
+      const withNotes = notes.length ? { ...page, notes: [...page.notes, ...notes] } : page;
+      const pageWithNotes = { ...withNotes, study };
+      const saved = await savePage({
+        ...newSavedPage({ page: pageWithNotes, sourceText: result.text, images: result.images, embeds: result.embeds }),
+        courseId: course?.id,
+      });
       navigate(`/pages/${saved.id}`);
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Something went wrong. Please try again."));
@@ -128,10 +145,45 @@ export default function CreatePage() {
             <Dropzone onFiles={addFiles} disabled={busy} />
           </div>
           <SourceList sources={sources} statuses={statuses} disabled={busy} onMove={move} onRemove={remove} />
+
+          <div className="mt-6 rounded-2xl border border-line">
+            <button
+              type="button"
+              aria-expanded={studyOpen}
+              onClick={() => setStudyOpen((o) => !o)}
+              className="flex w-full items-center justify-between px-4 py-3 text-left font-display text-lg font-semibold"
+            >
+              Study materials (optional)
+              <span aria-hidden="true">{studyOpen ? "−" : "+"}</span>
+            </button>
+            {studyOpen && (
+              <div className="border-t border-line p-4">
+                <StudyMaterialsForm value={study} onChange={setStudy} />
+              </div>
+            )}
+          </div>
         </section>
 
         <aside className="h-fit rounded-2xl bg-limestone p-6" aria-labelledby="options-heading">
           <h2 id="options-heading" className="font-display text-2xl font-semibold">Page options</h2>
+          <div className="mt-4">
+            <label className="block text-sm font-medium">
+              Course <span className="font-normal text-ink-muted">(optional)</span>
+              <select
+                aria-label="Course"
+                value={courseId}
+                onChange={(e) => setCourseId(e.target.value)}
+                disabled={busy}
+                className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 text-sm focus:border-purple focus:outline-none focus:ring-2 focus:ring-purple/30"
+              >
+                <option value="">No course</option>
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>{[c.code, c.name].filter(Boolean).join(" — ")}</option>
+                ))}
+              </select>
+            </label>
+            <Button variant="ghost" className="mt-1" disabled={busy} onClick={() => setCourseManagerOpen(true)}>Manage courses</Button>
+          </div>
           <label className="mt-4 block text-sm font-medium">
             Page title <span className="font-normal text-ink-muted">(optional)</span>
             <input
@@ -179,6 +231,13 @@ export default function CreatePage() {
         </aside>
       </div>
 
+      <CourseManagerModal
+        open={courseManagerOpen}
+        onClose={() => setCourseManagerOpen(false)}
+        onChanged={() => {
+          loadCourses();
+        }}
+      />
       <PasteCanvasModal open={pasteOpen} onClose={() => setPasteOpen(false)} onAdd={addCanvas} />
     </div>
   );

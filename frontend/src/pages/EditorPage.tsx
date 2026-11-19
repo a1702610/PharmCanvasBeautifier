@@ -5,16 +5,18 @@ import { getApiErrorMessage } from "../api/client";
 import { regenerateTab } from "../api/endpoints";
 import { CanvasPreview } from "../components/editor/CanvasPreview";
 import { NotesPanel } from "../components/editor/NotesPanel";
+import { StudyMaterialsForm, emptyStudy } from "../components/study/StudyMaterialsForm";
 import { RegenerateDialog } from "../components/editor/RegenerateDialog";
 import { TabRail } from "../components/editor/TabRail";
 import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
+import { buildCourseContext, getCourse } from "../storage/courses";
 import { setAtPath } from "../render/editing";
 import { buildContext, renderPage } from "../render/renderPage";
 import { getPage, savePage, type SavedPage } from "../storage/db";
 import { exportPageJson } from "../storage/exchange";
 import { imagesForAI, replaceTab, undoTab, usedImageRefs } from "../storage/pageOps";
-import type { Tab } from "../types/page";
+import type { StudyMaterials, Tab } from "../types/page";
 import { buildImagesZip, downloadBlob, safeFilename } from "../utils/downloads";
 import { formatDate } from "../utils/format";
 
@@ -29,6 +31,8 @@ export default function EditorPage() {
   const [regenTarget, setRegenTarget] = useState<Tab | null>(null);
   const [regenBusy, setRegenBusy] = useState(false);
   const [tipOpen, setTipOpen] = useState(false);
+  const [studyOpen, setStudyOpen] = useState(false);
+  const [studyDraft, setStudyDraft] = useState<StudyMaterials>(emptyStudy());
 
   // Mirrors `saved`, but written synchronously (not via a render/effect) wherever we change
   // it, so a handler that fires right after another one just saved (e.g. Copy/Undo clicked in
@@ -118,17 +122,33 @@ export default function EditorPage() {
     downloadBlob(new Blob([exportPageJson(current)], { type: "application/json" }), `${safeFilename(current.title)}.json`);
   }
 
+  function openStudy() {
+    setStudyDraft(current.page.study ?? emptyStudy());
+    setStudyOpen(true);
+  }
+
+  async function saveStudy() {
+    const base = savedRef.current ?? current;
+    setStudyOpen(false);
+    try {
+      await persist({ ...base, page: { ...base.page, study: studyDraft } });
+    } catch {
+      toast.error("Couldn't save study materials.");
+    }
+  }
+
   async function submitRegenerate(instruction: string) {
     if (!regenTarget) return;
     setRegenBusy(true);
     try {
+      const course = current.courseId ? await getCourse(current.courseId) : undefined;
       const result = await regenerateTab({
         text: current.sourceText,
         images: imagesForAI(current.images),
         outline: { intro: current.page.intro, tab_titles: current.page.tabs.map((t) => t.title) },
         tab: regenTarget,
         instruction,
-        course_context: "",
+        course_context: buildCourseContext(course),
       });
       const latest = (await getPage(current.id)) ?? current;
       await persist(replaceTab(latest, regenTarget.id, result.tab, result.notes));
@@ -174,6 +194,7 @@ export default function EditorPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           {downloadableRefs.length > 0 && <Button onClick={downloadImages}>Images ⤓</Button>}
+          <Button onClick={openStudy}>Study materials</Button>
           <Button onClick={exportPage}>Export</Button>
           <Button variant="primary" onClick={copyHtml}>Copy HTML</Button>
         </div>
@@ -233,6 +254,22 @@ export default function EditorPage() {
       </div>
 
       <RegenerateDialog tab={regenTarget} busy={regenBusy} onClose={() => setRegenTarget(null)} onSubmit={submitRegenerate} />
+      <Modal
+        open={studyOpen}
+        wide
+        title="Study materials"
+        onClose={() => setStudyOpen(false)}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setStudyOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={saveStudy}>Save</Button>
+          </>
+        }
+      >
+        <div className="max-h-[60vh] overflow-y-auto pr-1">
+          <StudyMaterialsForm value={studyDraft} onChange={setStudyDraft} />
+        </div>
+      </Modal>
       <Modal open={tipOpen} title="HTML copied" onClose={() => setTipOpen(false)} footer={<Button variant="primary" onClick={() => setTipOpen(false)}>Got it</Button>}>
         <ol className="list-decimal space-y-1 pl-5 font-serif text-sm leading-relaxed">
           <li>In Canvas, open the page and click <strong>Edit</strong>.</li>
