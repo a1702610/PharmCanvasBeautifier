@@ -12,13 +12,15 @@ const DASHED = `display: inline-block; padding: 10px 16px; border: 2px dashed ${
 
 export function studyMaterialsContentLines(page: Page, ctx: RenderContext): string[] {
   const study = page.study ?? { recordings: [], resources: [] };
+  const recs = study.recordings ?? [];
+  const ress = (study.resources ?? []).filter((r) => r?.title?.trim());
   const out: string[] = [];
 
   const activities = page.study_activities ?? [];
   if (activities.length) {
     const edit = (path: string) => (ctx.editable ? ` data-edit="${escapeAttr(path)}"` : "");
     out.push(
-      '<table style="width: 100%; border-collapse: collapse; margin: 8px 0 24px 0;">',
+      '<table style="width: 100%; border-collapse: collapse; margin: 18px 0;">',
       ...indent([
         "<thead>",
         ...indent([`<tr style="background: ${P.purple}; color: #ffffff;">`, ...indent([
@@ -51,7 +53,7 @@ export function studyMaterialsContentLines(page: Page, ctx: RenderContext): stri
   out.push(SPACER);
 
   out.push(`<h4 style="color: ${P.purple}; margin-top: 26px;">Recordings</h4>`);
-  const recordings = study.recordings.length ? study.recordings : [{}];
+  const recordings = recs.length ? recs : [{}];
   const rows = recordings.map((r: { part?: string; title?: string; recording_url?: string; transcript_url?: string }, i) => {
     const part = r.part?.trim() || `Part ${i + 1}`;
     const title = r.title?.trim();
@@ -62,14 +64,14 @@ export function studyMaterialsContentLines(page: Page, ctx: RenderContext): stri
     return { part: escapeText(part), recording, transcript };
   });
   out.push(
-    '<table style="width: 100%; border-collapse: collapse; margin: 10px 0 22px 0;">',
+    '<table style="width: 100%; border-collapse: collapse; margin: 18px 0;">',
     ...indent([
       "<thead>",
       ...indent([`<tr style="background: ${P.amberDark}; color: #ffffff;">`, ...indent(["Part", "Recording", "Transcript"].map((h) => `<th style="padding: 11px; text-align: left; border: 1px solid ${P.border};" scope="col">${h}</th>`)), "</tr>"]),
       "</thead>",
       "<tbody>",
       ...indent(rows.flatMap((r) => ["<tr>", ...indent([
-        `<th style="padding: 11px; background: ${P.lavender}; text-align: left; border: 1px solid ${P.border};" scope="row">${r.part}</th>`,
+        `<th style="padding: 11px; background: ${P.amberPale}; text-align: left; border: 1px solid ${P.border};" scope="row">${r.part}</th>`,
         `<td style="padding: 11px; border: 1px solid ${P.border};">${r.recording}</td>`,
         `<td style="padding: 11px; border: 1px solid ${P.border};">${r.transcript}</td>`,
       ]), "</tr>"])),
@@ -79,8 +81,8 @@ export function studyMaterialsContentLines(page: Page, ctx: RenderContext): stri
     SPACER,
   );
 
-  const resources = study.resources.length
-    ? study.resources.map((res) => {
+  const resources = ress.length
+    ? ress.map((res) => {
         const url = safeUrl(res.url);
         return `<p>${url ? link(url, escapeText(res.title)) : escapeText(res.title)}</p>`;
       })

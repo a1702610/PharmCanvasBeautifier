@@ -50,6 +50,11 @@ describe("renderPage", () => {
     expect(none).not.toContain("<hr");
   });
 
+  it("dangling embed_ref with nothing else renders no revision", () => {
+    const html = renderPage({ ...page, revision: { include: false, embed_ref: "NOPE" } }, ctx);
+    expect(html).not.toContain("Revision check");
+  });
+
   it("legacy page without new fields renders", () => {
     const legacy = { title: "Old", intro: ["x"], tabs: [{ id: "t1", title: "A", blocks: [{ type: "takeaways", items: ["y"] }] }], revision: { include: true }, notes: [] } as Page;
     const html = renderPage(legacy, buildContext([], []));

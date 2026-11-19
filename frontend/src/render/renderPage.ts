@@ -91,7 +91,7 @@ export function renderPage(page: Page, ctx: RenderContext): string {
     ...page.tabs.flatMap((t, i) => tabLines(t, ctx, i)),
     ...groupLines(`${page.tabs.length + 1}. Study materials`, studyMaterialsContentLines(page, ctx)),
   ];
-  const showRevision = (page.revision.points?.length ?? 0) > 0 || page.revision.include || !!page.revision.embed_ref;
+  const showRevision = (page.revision.points?.length ?? 0) > 0 || page.revision.include || !!(page.revision.embed_ref && ctx.embeds[page.revision.embed_ref]);
   const lines = [
     '<div id="dp-wrapper" class="dp-wrapper" style="color: #1f2937;">',
     ...indent([...introLines(page, ctx), SPACER, `<div class="${TABS_CLASS}">`, ...indent(tabs), "</div>", SPACER, ...(showRevision ? revisionLines(page, ctx) : [])]),

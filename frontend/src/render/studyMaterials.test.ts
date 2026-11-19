@@ -24,6 +24,8 @@ describe("study materials tab", () => {
     expect(h).toContain(">Recordings</h4>");
     expect(h).toContain('<tr style="background: #b45309; color: #ffffff;">');
     expect(h).toContain(">Part 1</th>");
+    expect(h).toContain('<table style="width: 100%; border-collapse: collapse; margin: 18px 0;">');
+    expect(h).toContain('<th style="padding: 11px; background: #fff7ed; text-align: left; border: 1px solid #cbd5e1;" scope="row">Part 1</th>');
     expect(h).toContain("[Add recording link]");
     expect(h).toContain("[Add transcript link]");
     expect(h).toContain('<h4 class="dp-panel-heading">Additional resources</h4>');
@@ -50,5 +52,13 @@ describe("study materials tab", () => {
     expect(h).toContain("<strong>Watch the recordings</strong>");
     expect(h).toContain('<p><a href="http://www.icp.org.nz/" target="_blank" rel="noopener">ICP</a></p>');
     expect(h).toContain("<p>No link</p>");
+  });
+
+  it("tolerates a partially formed study object", () => {
+    const h = html({ study: {} as never });
+    expect(h).toContain("[Add recording link]");
+    expect(h).toContain("[Add additional resources]");
+    const t = html({ study: { recordings: [], resources: [{ url: "https://x.org" } as never] } });
+    expect(t).toContain("[Add additional resources]");
   });
 });
