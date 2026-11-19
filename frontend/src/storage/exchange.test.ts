@@ -101,4 +101,37 @@ describe("parseImportedPage", () => {
     expect(imported.images).toEqual([{ ref: "IMG-01", source: "a", location: "" }]);
     expect(imported.embeds).toEqual([{ ref: "EMBED-01", html: "<iframe></iframe>" }]);
   });
+
+  it("keeps new page fields on import and drops malformed ones", () => {
+    const rich: SavedPage = {
+      ...saved,
+      page: {
+        title: "T",
+        intro: [],
+        tabs: [],
+        revision: {
+          include: false,
+          points: ["p"],
+          flow_title: "f",
+          flow: { type: "flow", steps: [{ label: "a", style: "solid" }, { label: "b", style: "outline" }] },
+        },
+        notes: [],
+        intro_figure: { type: "figure", ref: "IMG-01", alt: "x" },
+        study_activities: [{ task: "t", purpose: "p" }],
+        study: { handout: { label: "H", url: "https://x" }, recordings: [{ title: "R" }], resources: [{ title: "Res" }] },
+      },
+    };
+    const back = parseImportedPage(exportPageJson(rich));
+    expect(back.page.revision.points).toEqual(["p"]);
+    expect(back.page.intro_figure?.ref).toBe("IMG-01");
+    expect(back.page.study?.recordings[0].title).toBe("R");
+    const broken = JSON.parse(exportPageJson(rich));
+    broken.page.page.study = "nope";
+    broken.page.page.study_activities = [{ task: 1 }];
+    broken.page.page.intro_figure = { ref: 5 };
+    const cleaned = parseImportedPage(JSON.stringify(broken));
+    expect(cleaned.page.study).toBeUndefined();
+    expect(cleaned.page.study_activities).toBeUndefined();
+    expect(cleaned.page.intro_figure).toBeUndefined();
+  });
 });

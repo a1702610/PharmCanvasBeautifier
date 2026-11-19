@@ -14,6 +14,23 @@ const contractPage: Page = {
       id: "t1",
       title: "Overview",
       blocks: [
+        { type: "key_point", lead: "L", text: "T" },
+        { type: "flow", steps: [{ label: "Step A", style: "solid" }, { label: "Step B", sub: "Sub B", style: "outline" }] },
+        { type: "formula", expression: "x = y", note: "Formula note" },
+        { type: "table", headers: ["SH1", "SH2"], rows: [["S1C1", "S1C2"]], variant: "secondary" },
+        {
+          type: "accordion",
+          panels: [
+            {
+              title: "Panel title",
+              blocks: [
+                { type: "paragraph", text: "Panel paragraph" },
+                { type: "table", headers: ["PH1", "PH2"], rows: [["P1C1", "P1C2"]] },
+                { type: "self_check", questions: [{ question: "PQ", answer: "PA" }] },
+              ],
+            },
+          ],
+        },
         { type: "heading", text: "Heading text" },
         { type: "paragraph", text: "Paragraph text" },
         { type: "list", ordered: false, items: ["Item A", "Item B"] },
@@ -43,7 +60,14 @@ const contractPage: Page = {
       ],
     },
   ],
-  revision: { include: false },
+  intro_figure: { type: "figure", ref: "IMG-01", alt: "intro alt", caption: "Intro caption" },
+  study_activities: [{ task: "Do", purpose: "Why" }],
+  revision: {
+    include: false,
+    points: ["P1"],
+    flow_title: "Dir",
+    flow: { type: "flow", steps: [{ label: "a", style: "solid" }, { label: "b", style: "amber" }] },
+  },
   notes: [],
 };
 
@@ -66,11 +90,35 @@ describe("data-edit path contract", () => {
     }
   });
 
-  it("figure alt text and the fixed callout titles never get a data-edit path", () => {
+  it("covers the new paths", () => {
     const html = renderPage(contractPage, ctx);
-    expect(html).not.toContain('data-edit="tabs.0.blocks.10.alt"');
-    // "Why this matters clinically" (clinical) has no field of its own — only .body does.
-    const clinicalMatch = html.match(/Why this matters clinically<\/strong>/);
-    expect(clinicalMatch).not.toBeNull();
+    const paths = Array.from(html.matchAll(/data-edit="([^"]+)"/g)).map((m) => m[1]);
+    for (const p of [
+      "tabs.0.blocks.0.lead",
+      "tabs.0.blocks.0.text",
+      "tabs.0.blocks.1.steps.1.sub",
+      "tabs.0.blocks.2.expression",
+      "tabs.0.blocks.2.note",
+      "tabs.0.blocks.3.rows.0.1",
+      "tabs.0.blocks.4.panels.0.blocks.0.text",
+      "tabs.0.blocks.4.panels.0.blocks.1.rows.0.1",
+      "study_activities.0.task",
+      "study_activities.0.purpose",
+      "revision.points.0",
+      "revision.flow_title",
+      "revision.flow.steps.1.label",
+      "intro_figure.caption",
+    ]) expect(paths).toContain(p);
+  });
+
+  it("figure alt text, fixed callout titles and spacers never get a data-edit path", () => {
+    const html = renderPage(contractPage, ctx);
+    expect(html).not.toMatch(/data-edit="[^"]*\.alt"/);
+    // Fixed titles render as text but have no field of their own (only body/items do).
+    for (const title of ["Why this matters clinically:", "Pharmacist tip:"]) {
+      expect(html).toContain(title);
+      expect(html).not.toMatch(new RegExp(`data-edit="[^"]*"[^>]*>[^<]*${title}`));
+    }
+    expect(html).not.toMatch(/<p[^>]*data-edit[^>]*>&nbsp;<\/p>/);
   });
 });

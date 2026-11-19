@@ -38,7 +38,27 @@ function validatePage(v: unknown): Page {
         (n): n is Note => !!n && typeof n === "object" && NOTE_KINDS.includes((n as Note).kind) && typeof (n as Note).text === "string",
       )
     : [];
-  return { title: p.title, intro: p.intro, tabs: p.tabs, revision: p.revision ?? { include: false }, notes };
+  const raw = p as Record<string, unknown>;
+  const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x);
+  const fig = raw.intro_figure;
+  const intro_figure = isObj(fig) && typeof fig.ref === "string" && typeof fig.alt === "string" ? (fig as unknown as Page["intro_figure"]) : undefined;
+  const acts = raw.study_activities;
+  const study_activities =
+    Array.isArray(acts) && acts.every((a) => isObj(a) && typeof a.task === "string" && typeof a.purpose === "string")
+      ? (acts as Page["study_activities"])
+      : undefined;
+  const st = raw.study;
+  const study = isObj(st) && Array.isArray(st.recordings) && Array.isArray(st.resources) ? (st as unknown as Page["study"]) : undefined;
+  return {
+    title: p.title,
+    intro: p.intro,
+    tabs: p.tabs,
+    revision: p.revision ?? { include: false },
+    notes,
+    ...(intro_figure && { intro_figure }),
+    ...(study_activities && { study_activities }),
+    ...(study && { study }),
+  };
 }
 
 export function parseImportedPage(json: string): SavedPage {
