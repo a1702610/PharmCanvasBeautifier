@@ -32,12 +32,15 @@ const SUP_RE = /\^([^^\s]{1,16})\^/g;
 
 /** Render the allowed markdown subset (**bold**, *italic*, [text](https://url), ~sub~, ^sup^) to safe HTML. */
 export function renderInline(src: string): string {
-  return escapeText(src)
+  const html = escapeText(src)
     .replace(LINK_RE, (_m, text: string, url: string) => `<a href="${url}" target="_blank" rel="noopener">${text}</a>`)
     .replace(BOLD_RE, "<strong>$1</strong>")
-    .replace(ITALIC_RE, "$1<em>$2</em>")
-    .replace(SUB_RE, "<sub>$1</sub>")
-    .replace(SUP_RE, "<sup>$1</sup>");
+    .replace(ITALIC_RE, "$1<em>$2</em>");
+  // Sub/superscript only outside HTML tags, so href values are never rewritten.
+  return html
+    .split(/(<[^>]+>)/)
+    .map((seg) => (seg.startsWith("<") ? seg : seg.replace(SUB_RE, "<sub>$1</sub>").replace(SUP_RE, "<sup>$1</sup>")))
+    .join("");
 }
 
 export function splitParagraphs(s: string): string[] {

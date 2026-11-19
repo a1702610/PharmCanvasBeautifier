@@ -53,3 +53,14 @@ describe("subscript and superscript", () => {
     expect(renderInline("2^ 3")).toBe("2^ 3");
   });
 });
+
+describe("subscript and superscript placement", () => {
+  it("does not rewrite tildes inside link hrefs", () => {
+    expect(renderInline("[home](https://uni.edu/~bob/files/~old)")).toBe(
+      '<a href="https://uni.edu/~bob/files/~old" target="_blank" rel="noopener">home</a>',
+    );
+  });
+  it("works inside bold", () => {
+    expect(renderInline("**C~max~**")).toBe("<strong>C<sub>max</sub></strong>");
+  });
+});
