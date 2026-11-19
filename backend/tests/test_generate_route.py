@@ -107,3 +107,13 @@ def test_generate_empty_page_is_502(calls):
     response = client.post("/api/generate", json={"text": TEXT}, headers=HEADERS)
     assert response.status_code == 502
     assert response.json()["detail"] == "The AI returned an empty page. Please try again."
+
+
+def test_generate_passes_course_context_truncated(calls):
+    calls.outcome["value"] = wire_page()
+    long_ctx = "x" * 13000
+    r = client.post("/api/generate", json={"text": TEXT, "course_context": "  " + long_ctx + "  "}, headers=HEADERS)
+    assert r.status_code == 200
+    prompt = calls[-1]["prompt"]
+    assert "COURSE CONTEXT" in prompt
+    assert "x" * 12000 in prompt and "x" * 12001 not in prompt

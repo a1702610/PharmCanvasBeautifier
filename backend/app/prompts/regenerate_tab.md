@@ -7,3 +7,4 @@ You are now revising a single tab of an existing page, not writing a whole page.
 - Follow the lecturer's instruction. It overrides stylistic defaults but never the content rules: still no facts, doses, citations or links that aren't in the source material.
 - Stay within this tab's topic. The outline lists the other tabs; don't repeat their content.
 - Keep figures already in the tab, with the same ref ids, unless the instruction says otherwise.
+- Accordions are allowed inside this tab (one level only: no accordion inside an accordion).

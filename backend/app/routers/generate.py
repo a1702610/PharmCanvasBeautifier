@@ -2,7 +2,7 @@ import base64
 import binascii
 
 from fastapi import APIRouter, Header, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.ai import gemini
 from app.ai.prompts import build_generate_prompt, build_regenerate_prompt, load_prompt
@@ -25,6 +25,12 @@ class GenerateRequest(BaseModel):
     instructions: str = ""
     include_revision: bool = False
     title: str = ""
+    course_context: str = ""
+
+    @field_validator("course_context")
+    @classmethod
+    def _cap_course_context(cls, v: str) -> str:
+        return v.strip()[:12000]
 
 
 class Outline(BaseModel):
@@ -38,6 +44,12 @@ class RegenerateTabRequest(BaseModel):
     outline: Outline
     tab: Tab
     instruction: str = Field(min_length=1)
+    course_context: str = ""
+
+    @field_validator("course_context")
+    @classmethod
+    def _cap_course_context(cls, v: str) -> str:
+        return v.strip()[:12000]
 
 
 class GenerateResponse(BaseModel):
@@ -74,7 +86,7 @@ async def generate(req: GenerateRequest, x_gemini_key: str | None = Header(defau
         wire = await gemini.generate_structured(
             api_key=key,
             system_prompt=load_prompt("system"),
-            prompt=build_generate_prompt(req.title, req.include_revision, req.instructions, req.text),
+            prompt=build_generate_prompt(req.title, req.include_revision, req.instructions, req.text, course_context=req.course_context),
             images=_image_parts(req.images),
             schema=WirePage,
         )
@@ -98,6 +110,7 @@ async def regenerate_tab(req: RegenerateTabRequest, x_gemini_key: str | None = H
         intro=req.outline.intro,
         instruction=req.instruction,
         text=req.text,
+        course_context=req.course_context,
     )
     try:
         wire = await gemini.generate_structured(
