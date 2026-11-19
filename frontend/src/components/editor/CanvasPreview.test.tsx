@@ -226,3 +226,34 @@ describe("CanvasPreview: self-originated edits don't rebuild the DOM, external c
     expect(paraB.textContent).toBe("Para B EDITED");
   });
 });
+
+describe("CanvasPreview: tabs and accordions", () => {
+  it("tabs ignore accordion groups; accordion headings toggle open", () => {
+    const html = `<div id="dp-wrapper"><div class="dp-panels-wrapper dp-tabs-buttons-vertical">
+    <div class="dp-panel-group"><h3 class="dp-panel-heading">1. A</h3><div class="dp-panel-content">
+      <div class="dp-panels-wrapper dp-accordion-default"><div class="dp-panel-group"><h4 class="dp-panel-heading">More</h4><div class="dp-panel-content"><p>x</p></div></div></div>
+    </div></div>
+    <div class="dp-panel-group"><h3 class="dp-panel-heading">2. B</h3><div class="dp-panel-content"><p>y</p></div></div>
+  </div></div>`;
+    const onSelect = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(<CanvasPreview html={html} activeIndex={1} editable={false} onSelect={onSelect} onEdit={() => true} />);
+    });
+    const tabGroups = container.querySelectorAll(".dp-tabs-buttons-vertical > .dp-panel-group");
+    expect(tabGroups[1].classList.contains("is-active")).toBe(true);
+    expect(container.querySelector(".dp-accordion-default > .dp-panel-group")!.classList.contains("is-active")).toBe(false);
+    act(() => (container.querySelectorAll("h3.dp-panel-heading")[1] as HTMLElement).click());
+    expect(onSelect).toHaveBeenLastCalledWith(1);
+    const accHeading = container.querySelector("h4.dp-panel-heading") as HTMLElement;
+    act(() => accHeading.click());
+    expect(accHeading.parentElement!.classList.contains("is-open")).toBe(true);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    act(() => accHeading.click());
+    expect(accHeading.parentElement!.classList.contains("is-open")).toBe(false);
+    act(() => root.unmount());
+    container.remove();
+  });
+});

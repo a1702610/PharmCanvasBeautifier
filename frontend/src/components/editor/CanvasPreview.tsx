@@ -129,8 +129,15 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit }:
         const focusedPath = focused?.getAttribute("data-edit") ?? null;
         const caretOffset = focused ? getCaretOffset(focused) : 0;
 
+        const openIdx = Array.from(container.querySelectorAll(".dp-accordion-default > .dp-panel-group")).flatMap((g, i) =>
+          g.classList.contains("is-open") ? [i] : [],
+        );
+
         container.innerHTML = safe;
         renderedSafe.current = safe;
+
+        const accs = container.querySelectorAll(".dp-accordion-default > .dp-panel-group");
+        openIdx.forEach((i) => accs[i]?.classList.add("is-open"));
 
         if (focusedPath) {
           const restored = container.querySelector<HTMLElement>(`[data-edit="${escapeAttrSelector(focusedPath)}"]`);
@@ -150,14 +157,21 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit }:
   // useLayoutEffect (not useEffect) so the active tab's panel is shown/hidden before the
   // browser paints, avoiding a flash of the wrong (or no) panel right after a save re-render.
   useLayoutEffect(() => {
-    const groups = ref.current?.querySelectorAll<HTMLElement>(".dp-panel-group") ?? [];
+    const groups = ref.current?.querySelectorAll<HTMLElement>(".dp-tabs-buttons-vertical > .dp-panel-group") ?? [];
     groups.forEach((group, i) => group.classList.toggle("is-active", i === activeIndex));
   }, [safe, activeIndex]);
 
   function handleClick(e: MouseEvent<HTMLDivElement>) {
     const heading = (e.target as HTMLElement).closest(".dp-panel-heading");
     if (!heading || !ref.current) return;
-    const groups = Array.from(ref.current.querySelectorAll(".dp-panel-group"));
+    const group = heading.parentElement;
+    if (group?.parentElement?.classList.contains("dp-accordion-default")) {
+      // In edit mode a click inside the editable heading text places the caret instead.
+      if (editable && (e.target as HTMLElement).closest("[data-edit]")) return;
+      group.classList.toggle("is-open");
+      return;
+    }
+    const groups = Array.from(ref.current.querySelectorAll(".dp-tabs-buttons-vertical > .dp-panel-group"));
     const index = groups.indexOf(heading.parentElement as Element);
     if (index >= 0) onSelect(index);
   }
