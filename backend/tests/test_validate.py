@@ -253,3 +253,91 @@ def test_finalize_tab_notes_missing_clinical_callout():
 def test_finalize_tab_no_note_when_clinical_present():
     t, notes = finalize_tab(WireTab.model_validate(tab("A", P, CLINICAL)), CTX, "t4")
     assert notes == []
+
+
+# --- PHAR3004 house-style blocks and page fields ---
+from app.ai.schema import Accordion, Flow, Formula, KeyPoint, Table  # noqa: E402
+
+CLIN = CLINICAL
+
+
+def test_key_point_flow_formula_validated():
+    blocks = [
+        {"type": "key_point", "lead": "Lead.", "text": "Text [x](https://fake.example)"},
+        {"type": "key_point", "text": "  "},
+        {"type": "flow", "steps": [{"label": "Dose", "style": "solid"}, {"label": "  "}, {"label": "Effect", "style": None}]},
+        {"type": "flow", "steps": [{"label": "Only one"}]},
+        {"type": "formula", "expression": "CL = Q × E", "note": ""},
+        {"type": "formula", "expression": ""},
+        CLIN,
+    ]
+    page = finalize_page(wire([tab("A", *blocks), tab("B", P, CLIN), tab("C", P, CLIN)]), CTX, include_revision=False)
+    b = page.tabs[0].blocks
+    assert b[0] == KeyPoint(lead="Lead.", text="Text x")
+    assert isinstance(b[1], Flow) and [s.label for s in b[1].steps] == ["Dose", "Effect"]
+    assert b[1].steps[1].style == "outline"
+    assert b[2] == Formula(expression="CL = Q × E")
+    assert len(b) == 4  # empty key point, 1-step flow and empty formula dropped
+    assert any("fewer than two steps" in n.text for n in page.notes)
+
+
+def test_accordion_validated_recursively_and_nesting_dropped():
+    acc = {"type": "accordion", "panels": [
+        {"title": "Worked example", "blocks": [
+            {"type": "paragraph", "text": "See [fake](https://fake.example)"},
+            {"type": "figure", "ref": "IMG-09", "alt": "x"},
+            {"type": "clinical", "body": "Inside."},
+        ]},
+        {"title": "Empty", "blocks": [{"type": "paragraph", "text": " "}]},
+    ]}
+    page = finalize_page(wire([tab("A", acc), tab("B", P, CLIN), tab("C", P, CLIN)]), CTX, include_revision=False)
+    accordion = page.tabs[0].blocks[0]
+    assert isinstance(accordion, Accordion)
+    assert [p.title for p in accordion.panels] == ["Worked example"]
+    assert accordion.panels[0].blocks[0] == Paragraph(text="See fake")
+    assert len(accordion.panels[0].blocks) == 2  # unknown figure removed
+    # clinical inside the accordion satisfies the per-tab check
+    assert not any("Tab 'A'" in n.text for n in page.notes)
+
+
+def test_inner_accordion_type_is_rejected_by_wire_schema_or_dropped():
+    # WireInnerBlock cannot be "accordion", so a nested accordion fails validation at the wire level;
+    # finalize must still drop a panel whose blocks end up empty.
+    acc = {"type": "accordion", "panels": [{"title": "T", "blocks": []}]}
+    page = finalize_page(wire([tab("A", acc, P, CLIN), tab("B", P, CLIN), tab("C", P, CLIN)]), CTX, include_revision=False)
+    assert all(not isinstance(b, Accordion) for b in page.tabs[0].blocks)
+
+
+def test_table_variant_and_row_headers_pass_through():
+    t = {"type": "table", "headers": ["A", "B"], "rows": [["1", "2"]], "variant": "secondary", "row_headers": False}
+    page = finalize_page(wire([tab("A", t, CLIN), tab("B", P, CLIN), tab("C", P, CLIN)]), CTX, include_revision=False)
+    table = page.tabs[0].blocks[0]
+    assert isinstance(table, Table) and table.variant == "secondary" and table.row_headers is False
+
+
+def test_tab_title_number_prefix_stripped():
+    page = finalize_page(wire([tab("1. Overview", P, CLIN), tab("2) Next", P, CLIN), tab("Three", P, CLIN)]), CTX, include_revision=False)
+    assert [t.title for t in page.tabs] == ["Overview", "Next", "Three"]
+
+
+def test_page_fields_revision_points_flow_activities_intro_figure():
+    w = wire([tab("A", P, CLIN), tab("B", P, CLIN), tab("C", P, CLIN)])
+    from app.ai.schema import WireFigureRef, WireActivity, WireRevision, WireFlow, WireFlowStep
+    w.intro_figure = WireFigureRef(ref="IMG-01", alt="Course map")
+    w.study_activities = [WireActivity(task="Watch part 1", purpose="Framework"), WireActivity(task="", purpose="x")]
+    w.revision = WireRevision(points=["One", " ", "Two"] + [f"P{i}" for i in range(10)], flow_title="Direction",
+                              flow=WireFlow(steps=[WireFlowStep(label="CL"), WireFlowStep(label="k", style="amber")]))
+    page = finalize_page(w, CTX, include_revision=False)
+    assert page.intro_figure.ref == "IMG-01" and page.intro_figure.alt == "Course map"
+    assert [(a.task, a.purpose) for a in page.study_activities] == [("Watch part 1", "Framework")]
+    assert page.revision.points[:2] == ["One", "Two"] and len(page.revision.points) == 8
+    assert page.revision.flow_title == "Direction" and [s.label for s in page.revision.flow.steps] == ["CL", "k"]
+
+
+def test_unknown_intro_figure_dropped_silently():
+    from app.ai.schema import WireFigureRef
+    w = wire([tab("A", P, CLIN), tab("B", P, CLIN), tab("C", P, CLIN)])
+    w.intro_figure = WireFigureRef(ref="IMG-77", alt="x")
+    page = finalize_page(w, CTX, include_revision=False)
+    assert page.intro_figure is None
+    assert not any("IMG-77" in n.text for n in page.notes)

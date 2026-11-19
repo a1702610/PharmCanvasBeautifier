@@ -7,6 +7,8 @@ import re
 from dataclasses import dataclass
 
 from app.ai.schema import (
+    Accordion, Flow, FlowStep, Formula, KeyPoint, Panel, StudyActivity,
+    WireFlowStep, WireInnerBlock,
     Block, Caution, Citation, Clinical, Counselling, ContrastTable, Critical,
     Evidence, EvidenceChild, Figure, Heading, Link, ListBlock, Note, Page,
     Paragraph, Question, References, Revision, SelfCheck, Tab, Table,
@@ -21,6 +23,7 @@ URL_RE = re.compile(r"https?://" + _URL_BODY)
 MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((" + _URL_BODY + r")\)")
 IMG_REF_RE = re.compile(r"\[(IMG-\d+)")
 EMBED_REF_RE = re.compile(r"\[(EMBED-\d+)\]")
+TAB_NUMBER_RE = re.compile(r"^\s*\d+\s*[.)]\s+")
 
 
 def _norm_url(url: str) -> str:
@@ -93,7 +96,9 @@ class _Finalizer:
         if not rows:
             return None
         widths = self._col_widths(b.col_widths, len(headers))
-        return Table(headers=headers, col_widths=widths, rows=rows)
+        variant = "secondary" if b.variant == "secondary" else None
+        row_headers = False if b.row_headers is False else None
+        return Table(headers=headers, col_widths=widths, rows=rows, variant=variant, row_headers=row_headers)
 
     def _contrast(self, b: WireBlock) -> ContrastTable | None:
         left, right = self.text(b.left_header), self.text(b.right_header)
@@ -131,7 +136,19 @@ class _Finalizer:
             return self.figure(c.ref, c.alt, c.caption)
         return None
 
-    def block(self, b: WireBlock) -> Block | None:
+    def flow(self, steps: list[WireFlowStep] | None) -> Flow | None:
+        out = []
+        for s in steps or []:
+            label = self.text(s.label)
+            if label:
+                out.append(FlowStep(label=label, sub=self.text(s.sub) or None, style=s.style or "outline"))
+        if len(out) < 2:
+            if steps:
+                self.note("Removed a flow diagram with fewer than two steps.")
+            return None
+        return Flow(steps=out[:6])
+
+    def block(self, b: WireBlock | WireInnerBlock, allow_accordion: bool = True) -> Block | None:
         t = b.type
         if t in ("heading", "paragraph", "citation"):
             text = self.text(b.text)
@@ -186,13 +203,40 @@ class _Finalizer:
             if not body and not items:
                 return None
             return Critical(title=self.text(b.title) or None, body=body, items=items)
+        if t == "key_point":
+            text = self.text(b.text)
+            return KeyPoint(lead=self.text(b.lead) or None, text=text) if text else None
+        if t == "flow":
+            return self.flow(b.steps)
+        if t == "formula":
+            expression = self.text(b.expression)
+            return Formula(expression=expression, note=self.text(b.note) or None) if expression else None
+        if t == "accordion":
+            if not allow_accordion:
+                return None
+            panels = []
+            for p in getattr(b, "panels", None) or []:
+                inner = [x for x in (self.block(ib, allow_accordion=False) for ib in p.blocks) if x is not None]
+                if inner:
+                    panels.append(Panel(title=self.text(p.title) or "More detail", blocks=inner))
+            return Accordion(panels=panels) if panels else None
         return None
 
     def tab(self, w: WireTab, tab_id: str) -> Tab | None:
         blocks = [b for b in (self.block(b) for b in w.blocks) if b is not None]
         if not blocks:
             return None
-        return Tab(id=tab_id, title=self.text(w.title) or "Untitled", blocks=blocks)
+        title = TAB_NUMBER_RE.sub("", self.text(w.title)) or "Untitled"
+        return Tab(id=tab_id, title=title, blocks=blocks)
+
+
+def _has_clinical(blocks) -> bool:
+    for b in blocks:
+        if isinstance(b, Clinical):
+            return True
+        if isinstance(b, Accordion) and any(_has_clinical(p.blocks) for p in b.panels):
+            return True
+    return False
 
 
 def finalize_page(wire: WirePage, ctx: SourceContext, include_revision: bool) -> Page:
@@ -205,23 +249,38 @@ def finalize_page(wire: WirePage, ctx: SourceContext, include_revision: bool) ->
     if not 3 <= len(tabs) <= 8:
         f.note(f"This page has {len(tabs)} tabs; 3–8 is recommended.")
     for t in tabs:
-        if not any(isinstance(b, Clinical) for b in t.blocks):
+        if not _has_clinical(t.blocks):
             f.note(f"Tab '{t.title}' has no 'Why this matters clinically' callout.")
 
     embed_ref = (wire.revision.embed_ref or "").strip() or None
     if embed_ref and embed_ref not in ctx.embed_refs:
         f.note(f"Removed an unknown embed reference: {embed_ref}")
         embed_ref = None
+
+    intro = f.texts(wire.intro)
+    intro_figure = None
+    if wire.intro_figure and (wire.intro_figure.ref or "").strip() in ctx.image_refs:
+        intro_figure = f.figure(wire.intro_figure.ref, wire.intro_figure.alt, wire.intro_figure.caption)
+    activities = []
+    for a in wire.study_activities or []:
+        task, purpose = f.text(a.task), f.text(a.purpose)
+        if task and purpose:
+            activities.append(StudyActivity(task=task, purpose=purpose))
+    points = f.texts(wire.revision.points)[:8]
+    rev_flow = f.flow(wire.revision.flow.steps) if wire.revision.flow else None
     revision = Revision(
         include=include_revision or wire.revision.include or embed_ref is not None,
         embed_ref=embed_ref,
+        points=points or None,
+        flow_title=f.text(wire.revision.flow_title) or None,
+        flow=rev_flow,
     )
-
-    intro = f.texts(wire.intro)
     ai_notes = [Note(kind=n.kind, text=n.text.strip()) for n in wire.notes if n.text.strip()]
     return Page(
         title=wire.title.strip() or "Untitled page",
         intro=intro,
+        intro_figure=intro_figure,
+        study_activities=activities or None,
         tabs=tabs,
         revision=revision,
         notes=ai_notes + f.notes,
@@ -233,6 +292,6 @@ def finalize_tab(wire: WireTab, ctx: SourceContext, tab_id: str) -> tuple[Tab, l
     t = f.tab(wire, tab_id)
     if t is None:
         raise ValueError("The regenerated tab has no content.")
-    if not any(isinstance(b, Clinical) for b in t.blocks):
+    if not _has_clinical(t.blocks):
         f.note(f"Tab '{t.title}' has no 'Why this matters clinically' callout.")
     return t, f.notes
