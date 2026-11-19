@@ -96,6 +96,7 @@ export default function CreatePage() {
         instructions,
         include_revision: includeRevision,
         title,
+        course_context: "",
       });
       setStage("building");
       const notes = sourceNotes(result.sources);

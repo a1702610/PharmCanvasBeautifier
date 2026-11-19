@@ -41,3 +41,15 @@ describe("splitParagraphs", () => {
     expect(splitParagraphs("single")).toEqual(["single"]);
   });
 });
+
+describe("subscript and superscript", () => {
+  it("renders ~x~ and ^x^ without spaces inside", () => {
+    expect(renderInline("t~1/2~ and C~max~ = e^−kt^")).toBe("t<sub>1/2</sub> and C<sub>max</sub> = e<sup>&minus;kt</sup>");
+  });
+  it("leaves approximate-value tildes alone", () => {
+    expect(renderInline("~30 mL/min and ~5 days")).toBe("~30 mL/min and ~5 days");
+  });
+  it("leaves a lone caret alone", () => {
+    expect(renderInline("2^ 3")).toBe("2^ 3");
+  });
+});

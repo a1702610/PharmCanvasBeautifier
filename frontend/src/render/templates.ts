@@ -142,6 +142,12 @@ function childLines(child: EvidenceChild, ctx: RenderContext, path?: string): st
 
 export function blockLines(block: Block, ctx: RenderContext, path?: string): string[] {
   switch (block.type) {
+    // TODO(task 5): render the new block types
+    case "key_point":
+    case "flow":
+    case "formula":
+    case "accordion":
+      return [];
     case "heading":
       return [`<h4${editAttr(ctx, path && `${path}.text`)} style="color: ${NAVY};">${renderInline(block.text)}</h4>`];
     case "paragraph":

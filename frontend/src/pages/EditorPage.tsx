@@ -128,6 +128,7 @@ export default function EditorPage() {
         outline: { intro: current.page.intro, tab_titles: current.page.tabs.map((t) => t.title) },
         tab: regenTarget,
         instruction,
+        course_context: "",
       });
       const latest = (await getPage(current.id)) ?? current;
       await persist(replaceTab(latest, regenTarget.id, result.tab, result.notes));

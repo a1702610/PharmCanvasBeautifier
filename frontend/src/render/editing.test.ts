@@ -166,3 +166,7 @@ describe("setAtPath", () => {
     expect(page).toEqual(before);
   });
 });
+
+it("maps sub and sup back to ~ and ^", () => {
+  expect(htmlToMarkdown(el("t<sub>1/2</sub> = ln(2) &times; V<sub>d</sub> / CL; e<sup>−kt</sup>"))).toBe("t~1/2~ = ln(2) × V~d~ / CL; e^−kt^");
+});

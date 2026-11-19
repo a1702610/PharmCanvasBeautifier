@@ -46,6 +46,7 @@ export interface GenerateRequest {
   instructions: string;
   include_revision: boolean;
   title: string;
+  course_context: string;
 }
 
 export interface RegenerateTabRequest {
@@ -54,6 +55,7 @@ export interface RegenerateTabRequest {
   outline: { intro: string[]; tab_titles: string[] };
   tab: Tab;
   instruction: string;
+  course_context: string;
 }
 
 export type SourceInput =

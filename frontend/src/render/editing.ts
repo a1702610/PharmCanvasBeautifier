@@ -46,6 +46,10 @@ function inlineToMarkdown(node: Node): string {
     case "EM":
     case "I":
       return wrapMarker("*", childrenInline(el));
+    case "SUB":
+      return wrapMarker("~", childrenInline(el));
+    case "SUP":
+      return wrapMarker("^", childrenInline(el));
     case "A": {
       const href = el.getAttribute("href") ?? "";
       const text = childrenInline(el);
