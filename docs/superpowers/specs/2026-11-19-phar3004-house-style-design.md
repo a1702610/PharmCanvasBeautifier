@@ -230,10 +230,14 @@ URLs must match `^https?://` (others are dropped and treated as missing); all te
 
 ## 7. Course profiles (new)
 
-- Stored in IndexedDB (new object store `courses`, DB version bump with upgrade): `{ id, code, name, level, outcomes, notes, updatedAt }` (all strings; outcomes free text, e.g. one CLO per line).
-- Create page: optional "Course" select (None / saved profiles) with a "Manage courses" modal (add, edit, delete). The chosen profile id is saved on the `SavedPage` (`courseId?`).
-- The frontend builds `course_context` text: `Course: CODE — NAME\nYear level: LEVEL\nLearning outcomes:\nOUTCOMES\nNotes on this course/topic:\nNOTES` (empty lines omitted) and sends it with `/api/generate` and `/api/regenerate-tab` (regenerate uses the page's saved course; a deleted course sends nothing).
-- Backend: `course_context: str = ""` (max 4,000 chars, trimmed) on both request models; included in the prompt under "COURSE CONTEXT (use to pitch the level and connect content; do not reproduce it on the page)".
+Purpose: any course coordinator can use the app for their own course — every page shares the same look, while each coordinator supplies their own course details (aims, learning outcomes, level) so the AI pitches and connects content appropriately.
+
+- Stored in IndexedDB (new object store `courses`, DB version bump with upgrade): `{ id, code, name, level, aims, outcomes, notes, outline, outlineSource?, updatedAt }` (all strings; outcomes free text, e.g. one CLO per line; `outline` = text extracted from an uploaded course outline, `outlineSource` = its file name).
+- **Fill from course outline:** in the course profile form, a button to upload a Word (.docx) or PDF course outline. The frontend sends it to the existing `POST /api/extract` and stores the returned `text` (source header lines removed, image markers stripped) in `outline` (capped at 50,000 chars), editable in a textarea. The typed fields remain for quick edits.
+- **Export / import:** each profile can be exported as a JSON file (`{format: "pharm-canvas-course", version: 1, course}`) and imported (validated; new id) — to move it between computers or share with a co-teacher.
+- Create page: optional "Course" select (None / saved profiles) with a "Manage courses" modal (add, edit, delete, fill from outline, export, import). The chosen profile id is saved on the `SavedPage` (`courseId?`).
+- The frontend builds `course_context` text: `Course: CODE — NAME\nYear level: LEVEL\nCourse aims:\nAIMS\nLearning outcomes:\nOUTCOMES\nNotes on this course/topic:\nNOTES\nCourse outline (extract):\nOUTLINE` (empty sections omitted), truncated to 12,000 chars (outline truncated first), and sends it with `/api/generate` and `/api/regenerate-tab` (regenerate uses the page's saved course; a deleted course sends nothing).
+- Backend: `course_context: str = ""` (max 12,000 chars, trimmed) on both request models; included in the prompt under "COURSE CONTEXT (use to pitch the level and connect content; do not reproduce it on the page)".
 
 ## 8. Page JSON schema changes
 
@@ -284,5 +288,5 @@ Rewrite around the new architecture while keeping §1 content rules. Add from th
 - Spacer placement tests (§5): between major blocks only, end-of-content spacer, around accordions, none inside wrappers, no doubles.
 - Study materials tests: every present/missing combination, URL scheme filtering, escaping.
 - Backend: schema parsing incl. accordion panels; validation inside accordions (links, figures, empty panels, nested clinical count); flow/formula/key_point rules; course_context in prompts and length cap; tab title numbering absent from AI output handling (strip a leading "N. " if the AI adds one).
-- Frontend: sub/sup inline round-trip; editing contract test over all new paths; course profile store (CRUD, DB upgrade from v1 preserves pages); study-materials form ↔ page JSON.
+- Frontend: sub/sup inline round-trip; editing contract test over all new paths; course profile store (CRUD, DB upgrade from v1 preserves pages), course export/import validation, course_context building and 12,000-char truncation (outline first), outline extraction clean-up; study-materials form ↔ page JSON.
 - Manual: real-browser check of preview (tabs, accordions, editing) and a paste into a Canvas sandbox page.
