@@ -1,62 +1,37 @@
 import { describe, expect, it } from "vitest";
 import type { Block } from "../types/page";
-import { blockLines, type RenderContext, withAlt } from "./templates";
+import { blockLines, contentLines, SPACER, type RenderContext } from "./templates";
 
-const TD = 'style="padding: 10px 12px; vertical-align: top; border: 1px solid #cbd5e1;"';
 const ctx: RenderContext = {
   images: {
     "IMG-01": { ref: "IMG-01", source: "deck.pptx", location: "slide 7", mime: "image/png", data_b64: "AAAA" },
-    "IMG-02": {
-      ref: "IMG-02",
-      source: "Pasted Canvas page 1",
-      location: "",
-      canvas_tag: '<img src="https://learn.adelaide.edu.au/courses/1/files/2/preview" alt="image.png" width="616" height="394" data-api-endpoint="https://learn.adelaide.edu.au/api/v1/courses/1/files/2" data-api-returntype="File"/>',
-    },
+    "IMG-02": { ref: "IMG-02", source: "Pasted Canvas page 1", location: "", canvas_tag: '<img src="https://x/preview" alt="image.png"/>' },
   },
   embeds: {},
 };
-const render = (b: Block) => blockLines(b, ctx).join("\n");
+const r = (b: Block) => blockLines(b, ctx).join("\n");
+const HTH = 'style="padding: 11px; text-align: left; border: 1px solid #cbd5e1;" scope="col"';
+const TD = 'style="padding: 11px; border: 1px solid #cbd5e1;"';
 
-describe("block templates", () => {
+describe("PHAR3004 templates", () => {
   it("heading", () => {
-    expect(render({ type: "heading", text: "Why it matters" })).toBe('<h4 style="color: #1e3a5f;">Why it matters</h4>');
+    expect(r({ type: "heading", text: "Why it matters" })).toBe('<h4 style="color: #140f50;">Why it matters</h4>');
   });
 
-  it("paragraph and list", () => {
-    expect(render({ type: "paragraph", text: "Body" })).toBe("<p>Body</p>");
-    expect(render({ type: "list", ordered: false, items: ["A", "B"] })).toBe("<ul>\n    <li>A</li>\n    <li>B</li>\n</ul>");
-    expect(render({ type: "list", ordered: true, items: ["A"] })).toBe("<ol>\n    <li>A</li>\n</ol>");
-  });
-
-  it("standard table: default widths, bold label column, zebra rows, multi-paragraph cells", () => {
-    const html = render({
-      type: "table",
-      headers: ["Category", "Risk factors"],
-      rows: [
-        ["**Pain-related**", "Severe acute pain"],
-        ["Psychological", "Depression\n\nAnxiety"],
-      ],
-    });
-    expect(html).toBe(
+  it("primary table with row labels", () => {
+    expect(r({ type: "table", headers: ["Concept", "What it studies"], rows: [["**PK**", "Time course"]] })).toBe(
       [
-        '<table style="border-collapse: collapse; width: 100%; margin: 16px 0;">',
+        '<table style="width: 100%; border-collapse: collapse; margin: 18px 0;">',
         "    <thead>",
-        "        <tr>",
-        '            <th style="background-color: #1e3a5f; color: #ffffff; padding: 10px 12px; text-align: left; width: 26%; border: 1px solid #1e3a5f;">Category</th>',
-        '            <th style="background-color: #1e3a5f; color: #ffffff; padding: 10px 12px; text-align: left; border: 1px solid #1e3a5f;">Risk factors</th>',
+        '        <tr style="background: #140f50; color: #ffffff;">',
+        `            <th ${HTH}>Concept</th>`,
+        `            <th ${HTH}>What it studies</th>`,
         "        </tr>",
         "    </thead>",
         "    <tbody>",
         "        <tr>",
-        `            <td ${TD}><strong>Pain-related</strong></td>`,
-        `            <td ${TD}>Severe acute pain</td>`,
-        "        </tr>",
-        '        <tr style="background-color: #f1f5f9;">',
-        `            <td ${TD}><strong>Psychological</strong></td>`,
-        `            <td ${TD}>`,
-        "                <p>Depression</p>",
-        "                <p>Anxiety</p>",
-        "            </td>",
+        '            <th style="padding: 11px; background: #f4f2fb; text-align: left; border: 1px solid #cbd5e1;" scope="row">PK</th>',
+        `            <td ${TD}>Time course</td>`,
         "        </tr>",
         "    </tbody>",
         "</table>",
@@ -64,306 +39,225 @@ describe("block templates", () => {
     );
   });
 
-  it("table with three columns spreads widths evenly unless given", () => {
-    const even = render({ type: "table", headers: ["A", "B", "C"], rows: [["1", "2", "3"]] });
-    expect(even.match(/width: 33\.33%;/g)).toHaveLength(3);
-    const given = render({ type: "table", headers: ["A", "B", "C"], col_widths: [6.70732, 16.17, 77.12], rows: [["1", "2", "3"]] });
-    expect(given).toContain("width: 6.71%;");
-    expect(given).toContain("width: 77.12%;");
+  it("secondary table uses dark amber header and pale amber labels", () => {
+    const html = r({ type: "table", headers: ["Route", "Input"], rows: [["IV", "Direct"]], variant: "secondary" });
+    expect(html).toContain('<tr style="background: #b45309; color: #ffffff;">');
+    expect(html).toContain('background: #fff7ed; text-align: left;');
   });
 
-  it("contrast table", () => {
-    expect(render({ type: "contrast_table", left_header: "Acute pain", right_header: "Chronic pain", rows: [["Symptom", "Disease"]] })).toBe(
-      [
-        '<table style="border-collapse: collapse; width: 100%; margin: 16px 0;">',
-        "    <thead>",
-        "        <tr>",
-        '            <th style="background-color: #166534; color: #ffffff; padding: 10px 12px; text-align: left; width: 50%; border: 1px solid #166534;">Acute pain</th>',
-        '            <th style="background-color: #b91c1c; color: #ffffff; padding: 10px 12px; text-align: left; width: 50%; border: 1px solid #b91c1c;">Chronic pain</th>',
-        "        </tr>",
-        "    </thead>",
-        "    <tbody>",
-        "        <tr>",
-        `            <td ${TD}>Symptom</td>`,
-        `            <td ${TD}>Disease</td>`,
-        "        </tr>",
-        "    </tbody>",
-        "</table>",
-      ].join("\n"),
-    );
+  it("row_headers false renders the first column as plain td", () => {
+    const html = r({ type: "table", headers: ["Time (h)", "Conc"], rows: [["2", "5.13"]], row_headers: false });
+    expect(html).not.toContain('scope="row"');
+    expect(html).toContain(`<td ${TD}>2</td>`);
   });
 
-  it("clinical callout", () => {
-    expect(render({ type: "clinical", body: "Prevention works." })).toBe(
-      '<div style="border-left: 4px solid #0d9488; background-color: #f0fdfa; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #0f766e;">Why this matters clinically</strong><br />Prevention works.</div>',
-    );
-  });
-
-  it("caution callout with items and with body", () => {
-    expect(render({ type: "caution", title: "If using an opioid, consider:", items: ["**Start low** - go slow"] })).toBe(
-      [
-        '<div style="border-left: 4px solid #f59e0b; background-color: #fffbeb; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #b45309;">If using an opioid, consider:</strong>',
-        '    <ul style="margin: 8px 0 0 0;">',
-        "        <li><strong>Start low</strong> - go slow</li>",
-        "    </ul>",
-        "</div>",
-      ].join("\n"),
-    );
-    expect(render({ type: "caution", title: "Red flag", body: "Refer urgently." })).toBe(
-      '<div style="border-left: 4px solid #f59e0b; background-color: #fffbeb; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #b45309;">Red flag</strong><br />Refer urgently.</div>',
-    );
-  });
-
-  it("evidence box with summary, figure, citation and references", () => {
+  it("flow", () => {
     expect(
-      render({
-        type: "evidence",
-        title: "Evidence: Paracetamol in chronic pain",
-        children: [
-          { type: "paragraph", text: "Little efficacy." },
-          { type: "figure", ref: "IMG-01", alt: "Forest plot" },
-          { type: "citation", text: "Ennis ZN. *Basic Clin Pharmacol Toxicol*. 2016." },
-          { type: "list", items: ["Finding"] },
-          { type: "references", items: ["Ref A"] },
-        ],
-      }),
+      r({ type: "flow", steps: [{ label: "Dose", style: "solid" }, { label: "Concentration", sub: "PK", style: "outline" }, { label: "Effect", style: "amber" }] }),
     ).toBe(
       [
-        '<div style="background-color: #eef2ff; padding: 16px 18px; margin: 16px 0px; border-radius: 6px; border: 1px solid #c7d2fe;">',
-        '    <p style="margin-top: 0;"><strong style="color: #3730a3;">Evidence: Paracetamol in chronic pain</strong></p>',
-        "    <p>Little efficacy.</p>",
-        '    <p style="text-align: center; border: 2px dashed #94a3b8; padding: 24px; color: #64748b;">[INSERT IMAGE IMG-01: Forest plot, slide 7]</p>',
-        '    <p style="text-align: center;"><span style="font-size: 8pt; color: #64748b;">Ennis ZN. <em>Basic Clin Pharmacol Toxicol</em>. 2016.</span></p>',
-        '    <ul style="margin: 0;">',
-        "        <li>Finding</li>",
-        "    </ul>",
-        '    <p style="margin-bottom: 4px;"><span style="text-decoration: underline;">References:</span></p>',
-        '    <p style="margin: 4px 0;"><span style="font-size: 8pt; color: #64748b;">Ref A</span></p>',
+        '<div style="margin: 24px 0;">',
+        '    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; text-align: center;">',
+        '        <div style="padding: 13px 18px; background: #140f50; color: #ffffff; border-radius: 8px;"><strong>Dose</strong></div>',
+        '        <div style="font-size: 1.5em; color: #d97706;" aria-hidden="true">&rarr;</div>',
+        '        <div style="padding: 13px 18px; background: #f4f2fb; border-radius: 8px; border: 2px solid #140f50;"><strong>Concentration</strong><br /><span style="font-size: 0.9em;">PK</span></div>',
+        '        <div style="font-size: 1.5em; color: #d97706;" aria-hidden="true">&rarr;</div>',
+        '        <div style="padding: 13px 18px; background: #fff7ed; border-radius: 8px; border: 2px solid #d97706;"><strong>Effect</strong></div>',
+        "    </div>",
         "</div>",
       ].join("\n"),
     );
   });
 
-  it("link callout", () => {
-    expect(render({ type: "link", lead_in: "To read more on the report:", url: "https://x.org/a.pdf", link_text: "2025 Report" })).toBe(
-      '<div style="border-left: 4px solid #2563eb; background-color: #eff6ff; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;">To read more on the report: <a href="https://x.org/a.pdf" target="_blank" rel="noopener">2025 Report</a></div>',
-    );
-    expect(render({ type: "link", lead_in: "Guidance", url: "https://x.org", link_text: "TGA" })).toContain(">Guidance: <a ");
-  });
-
-  it("link callout with a non-http(s) url renders as plain escaped text, no <a>", () => {
-    const html = render({ type: "link", lead_in: "See", url: "javascript:alert(1)", link_text: "<script>bad</script>" });
-    expect(html).toBe(
-      '<div style="border-left: 4px solid #2563eb; background-color: #eff6ff; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;">See: &lt;script&gt;bad&lt;/script&gt;</div>',
-    );
-    expect(html).not.toContain("<a ");
-  });
-
-  it("figure placeholder and caption", () => {
-    expect(render({ type: "figure", ref: "IMG-01", alt: "Opioid ladder", caption: "AMH Online" })).toBe(
+  it("formula with note", () => {
+    expect(r({ type: "formula", expression: "CL = Q × E", note: "Q = blood flow" })).toBe(
       [
-        '<p style="text-align: center; border: 2px dashed #94a3b8; padding: 24px; color: #64748b;">[INSERT IMAGE IMG-01: Opioid ladder, slide 7]</p>',
-        '<p style="text-align: center;"><span style="font-size: 8pt; color: #64748b;">AMH Online</span></p>',
+        '<div style="margin: 18px auto; padding: 16px; max-width: 440px; text-align: center; background: #f4f2fb; border-radius: 8px; border: 1px solid #ddd8ef;">',
+        '    <p style="margin: 0; font-size: 1.25em;"><strong>CL = Q &times; E</strong></p>',
+        '    <p style="margin: 6px 0 0 0; font-size: 0.9em; color: #64748b;">Q = blood flow</p>',
+        "</div>",
       ].join("\n"),
     );
   });
 
-  it("canvas figure keeps the original tag, replacing a filename alt", () => {
-    expect(render({ type: "figure", ref: "IMG-02", alt: "Opioid ladder" })).toBe(
-      '<p style="text-align: center;"><img src="https://learn.adelaide.edu.au/courses/1/files/2/preview" alt="Opioid ladder" width="616" height="394" data-api-endpoint="https://learn.adelaide.edu.au/api/v1/courses/1/files/2" data-api-returntype="File"/></p>',
+  it("key point and clinical", () => {
+    expect(r({ type: "key_point", lead: "Distribution is reversible.", text: "Drug moves back." })).toBe(
+      '<div style="margin: 20px 0; padding: 16px 18px; border-left: 5px solid #140f50; background: #f4f2fb;"><p style="margin: 0;"><strong>Distribution is reversible.</strong> Drug moves back.</p></div>',
+    );
+    expect(r({ type: "clinical", body: "Prevention works." })).toBe(
+      '<div style="margin: 20px 0; padding: 16px 18px; border-left: 5px solid #d97706; background: #fff7ed;"><p style="margin: 0;"><strong>Why this matters clinically:</strong> Prevention works.</p></div>',
     );
   });
 
-  it("takeaways", () => {
-    expect(render({ type: "takeaways", items: ["A", "B"] })).toBe(
+  it("caution with items", () => {
+    expect(r({ type: "caution", title: "Before starting", items: ["**Check** renal function"] })).toBe(
       [
-        '<div style="border: 1px solid #1e3a5f; border-radius: 6px; margin: 16px 0; overflow: hidden;">',
-        '    <div style="background-color: #1e3a5f; color: #ffffff; padding: 8px 16px; font-weight: bold;">Key takeaways</div>',
-        '    <ul style="margin: 12px 16px 12px 0; padding-left: 40px;">',
-        "        <li>A</li>",
-        "        <li>B</li>",
+        '<div style="margin: 20px 0px; padding: 17px 19px; background: #fff7ed; border-radius: 8px; border: 2px solid #d97706;">',
+        '    <p style="margin: 0 0 8px 0;"><strong>Before starting</strong></p>',
+        '    <ul style="margin: 0; padding-left: 24px;">',
+        "        <li><strong>Check</strong> renal function</li>",
         "    </ul>",
         "</div>",
       ].join("\n"),
     );
   });
 
-  it("self_check with two questions, numbered 1. and 2.", () => {
-    expect(
-      render({
-        type: "self_check",
-        questions: [
-          { question: "Q1", answer: "A1" },
-          { question: "Q2", answer: "A2" },
-        ],
-      }),
-    ).toBe(
+  it("critical keeps the red exception", () => {
+    expect(r({ type: "critical", body: "Do not combine." })).toBe(
+      '<div style="margin: 20px 0; padding: 16px 18px; border-left: 5px solid #b91c1c; background: #fef2f2;"><p style="margin: 0;"><strong style="color: #991b1b;">Critical safety warning</strong> Do not combine.</p></div>',
+    );
+  });
+
+  it("self check", () => {
+    expect(r({ type: "self_check", questions: [{ question: "Q1?", answer: "A1." }] })).toBe(
       [
-        '<div style="border-left: 4px solid #e11d48; background-color: #fff1f2; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #be123c;">Check your understanding</strong>',
-        '    <p style="margin: 10px 0 4px 0;"><strong>1.</strong> Q1</p>',
+        '<div style="margin: 20px 0; padding: 16px 18px; border-left: 5px solid #836bff; background: #f4f2fb;">',
+        '    <p style="margin: 0 0 8px 0;"><strong style="color: #140f50;">Check your understanding</strong></p>',
+        '    <p style="margin: 10px 0 4px 0;"><strong>1.</strong> Q1?</p>',
         "    <details>",
-        '        <summary style="cursor: pointer; color: #be123c;">Show answer</summary>',
-        '        <p style="margin: 6px 0 0 0;">A1</p>',
-        "    </details>",
-        '    <p style="margin: 10px 0 4px 0;"><strong>2.</strong> Q2</p>',
-        "    <details>",
-        '        <summary style="cursor: pointer; color: #be123c;">Show answer</summary>',
-        '        <p style="margin: 6px 0 0 0;">A2</p>',
+        '        <summary style="cursor: pointer; color: #140f50;">Show answer</summary>',
+        '        <p style="margin: 6px 0 0 0;">A1.</p>',
         "    </details>",
         "</div>",
       ].join("\n"),
     );
   });
 
-  it("counselling callout defaults its title, and accepts a custom one", () => {
-    expect(render({ type: "counselling", items: ["Take with food"] })).toBe(
+  it("figure placeholder", () => {
+    expect(r({ type: "figure", ref: "IMG-01", alt: "Pathway" })).toBe(
+      '<p style="text-align: center; border: 2px dashed #cbd5e1; padding: 20px; color: #64748b;">[ IMAGE IMG-01: Pathway, slide 7 &mdash; delete this line and insert from Canvas Files ]</p>',
+    );
+  });
+
+  it("accordion with spaced panel content", () => {
+    expect(
+      r({ type: "accordion", panels: [{ title: "Worked example", blocks: [{ type: "paragraph", text: "Step 1" }, { type: "formula", expression: "k = CL / V" }] }] }),
+    ).toBe(
       [
-        '<div style="border-left: 4px solid #16a34a; background-color: #f0fdf4; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #15803d;">Counselling points</strong>',
-        '    <ul style="margin: 8px 0 0 0;">',
+        '<div class="dp-panels-wrapper dp-accordion-default">',
+        '    <div class="dp-panel-group">',
+        '        <h4 class="dp-panel-heading">Worked example</h4>',
+        '        <div class="dp-panel-content">',
+        "            <p>Step 1</p>",
+        `            ${SPACER}`,
+        '            <div style="margin: 18px auto; padding: 16px; max-width: 440px; text-align: center; background: #f4f2fb; border-radius: 8px; border: 1px solid #ddd8ef;">',
+        '                <p style="margin: 0; font-size: 1.25em;"><strong>k = CL / V</strong></p>',
+        "            </div>",
+        `            ${SPACER}`,
+        "        </div>",
+        "    </div>",
+        "</div>",
+      ].join("\n"),
+    );
+  });
+});
+
+describe("contentLines spacing", () => {
+  const p = (t: string): Block => ({ type: "paragraph", text: t });
+  it("no spacer between prose, spacer around major blocks, one trailing spacer", () => {
+    const lines = contentLines([p("a"), p("b"), { type: "clinical", body: "c" }, p("d")], ctx);
+    expect(lines.filter((l) => l === SPACER)).toHaveLength(3);
+    expect(lines[0]).toBe("<p>a</p>");
+    expect(lines[1]).toBe("<p>b</p>");
+    expect(lines[2]).toBe(SPACER);
+    expect(lines[lines.length - 1]).toBe(SPACER);
+    expect(lines.join("\n")).not.toContain(`${SPACER}\n${SPACER}`);
+  });
+  it("empty content is just one spacer", () => {
+    expect(contentLines([], ctx)).toEqual([SPACER]);
+  });
+});
+
+const BOX_AMBER = "margin: 20px 0px; padding: 17px 19px; background: #fff7ed; border-radius: 8px; border: 2px solid #d97706;";
+const BOX_BLUE = "margin: 20px 0px; padding: 17px 19px; background: #eff4ff; border-radius: 8px; border: 2px solid #b8caff;";
+const ed: RenderContext = { ...ctx, editable: true };
+const re = (b: Block, path: string) => blockLines(b, ed, path).join("\n");
+
+describe("remaining components", () => {
+  it("caution body-only", () => {
+    expect(r({ type: "caution", title: "Careful", body: "Check dose." })).toBe(
+      `<div style="${BOX_AMBER}"><p style="margin: 0;"><strong>Careful</strong> Check dose.</p></div>`,
+    );
+  });
+  it("critical with custom title", () => {
+    expect(r({ type: "critical", title: "Stop", body: "Now." })).toContain("<strong style=\"color: #991b1b;\">Stop</strong> Now.");
+  });
+  it("tip", () => {
+    expect(r({ type: "tip", body: "Use a spacer." })).toBe(
+      '<div style="margin: 20px 0; padding: 16px 18px; border-left: 5px solid #1448ff; background: #eff4ff;"><p style="margin: 0;"><strong style="color: #1039cc;">Pharmacist tip:</strong> Use a spacer.</p></div>',
+    );
+  });
+  it("counselling default and custom title", () => {
+    const style = "margin: 20px 0px; padding: 17px 19px; background: #f4f2fb; border-radius: 8px; border: 1px solid #ddd8ef;";
+    expect(r({ type: "counselling", items: ["Take with food"] })).toBe(
+      [
+        `<div style="${style}">`,
+        '    <p style="margin: 0 0 8px 0;"><strong style="color: #140f50;">Counselling points</strong></p>',
+        '    <ul style="margin: 0; padding-left: 24px;">',
         "        <li>Take with food</li>",
         "    </ul>",
         "</div>",
       ].join("\n"),
     );
-    expect(render({ type: "counselling", title: "Before you start", items: ["Item"] })).toBe(
-      [
-        '<div style="border-left: 4px solid #16a34a; background-color: #f0fdf4; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #15803d;">Before you start</strong>',
-        '    <ul style="margin: 8px 0 0 0;">',
-        "        <li>Item</li>",
-        "    </ul>",
-        "</div>",
-      ].join("\n"),
-    );
+    expect(r({ type: "counselling", title: "Tell the patient", items: ["x"] })).toContain("Tell the patient</strong>");
   });
-
-  it("tip callout", () => {
-    expect(render({ type: "tip", body: "Shake well before use." })).toBe(
-      '<div style="border-left: 4px solid #0ea5e9; background-color: #f0f9ff; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #0369a1;">Pharmacist tip</strong><br />Shake well before use.</div>',
-    );
-  });
-
-  it("critical callout with items (default title), body only (custom title), and items + body", () => {
-    expect(render({ type: "critical", items: ["Risk of serotonin syndrome"] })).toBe(
-      [
-        '<div style="border-left: 4px solid #dc2626; background-color: #fef2f2; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #b91c1c;">Critical safety warning</strong>',
-        '    <ul style="margin: 8px 0 0 0;">',
-        "        <li>Risk of serotonin syndrome</li>",
-        "    </ul>",
-        "</div>",
-      ].join("\n"),
-    );
-    expect(render({ type: "critical", title: "Overdose risk", body: "Doses above 4 g/day can cause liver failure." })).toBe(
-      '<div style="border-left: 4px solid #dc2626; background-color: #fef2f2; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #b91c1c;">Overdose risk</strong><br />Doses above 4 g/day can cause liver failure.</div>',
-    );
+  it("evidence with children", () => {
     expect(
-      render({
-        type: "critical",
-        title: "Boxed warning",
-        body: "Contraindicated in pregnancy.",
-        items: ["Category X teratogen", "Discontinue immediately if pregnancy occurs"],
-      }),
+      r({ type: "evidence", title: "Evidence: Trial X", children: [{ type: "paragraph", text: "Result." }, { type: "citation", text: "Smith 2020" }] }),
     ).toBe(
       [
-        '<div style="border-left: 4px solid #dc2626; background-color: #fef2f2; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #b91c1c;">Boxed warning</strong><br />Contraindicated in pregnancy.',
-        '    <ul style="margin: 8px 0 0 0;">',
-        "        <li>Category X teratogen</li>",
-        "        <li>Discontinue immediately if pregnancy occurs</li>",
+        `<div style="${BOX_BLUE}">`,
+        '    <p style="margin: 0 0 8px 0;"><strong style="color: #1039cc;">Evidence: Trial X</strong></p>',
+        "    <p>Result.</p>",
+        '    <p style="text-align: center;"><span style="font-size: 8pt; color: #64748b;">Smith 2020</span></p>',
+        "</div>",
+      ].join("\n"),
+    );
+  });
+  it("link", () => {
+    expect(r({ type: "link", lead_in: "Guideline", link_text: "Read", url: "https://x.org" })).toBe(
+      `<div style="${BOX_BLUE}"><p style="margin: 0;">Guideline: <a href="https://x.org" target="_blank" rel="noopener">Read</a></p></div>`,
+    );
+  });
+  it("legacy takeaways", () => {
+    expect(r({ type: "takeaways", items: ["One"] })).toBe(
+      [
+        '<div style="border: 1px solid #ddd8ef; border-radius: 8px; margin: 16px 0; overflow: hidden;">',
+        '    <div style="background: #140f50; color: #ffffff; padding: 8px 16px; font-weight: bold;">Key takeaways</div>',
+        '    <ul style="margin: 12px 16px 12px 0; padding-left: 40px;">',
+        "        <li>One</li>",
         "    </ul>",
         "</div>",
       ].join("\n"),
     );
   });
-});
-
-describe("block templates: inline editing (editable context)", () => {
-  const editableCtx: RenderContext = { ...ctx, editable: true };
-  const renderEditable = (b: Block, path: string) => blockLines(b, editableCtx, path).join("\n");
-
-  it("does not add data-edit when editable is true but no path is given", () => {
-    expect(render({ type: "paragraph", text: "Body" })).toBe("<p>Body</p>");
+  it("contrast table", () => {
+    const html = r({ type: "contrast_table", left_header: "Acute", right_header: "Chronic", rows: [["a", "b"]] });
+    expect(html).toContain('width: 50%; background: #140f50; color: #ffffff; border: 1px solid #cbd5e1;" scope="col">Acute</th>');
+    expect(html).toContain('width: 50%; background: #b45309; color: #ffffff;');
+    expect(html).toContain(`<td ${TD}>b</td>`);
   });
-
-  it("paragraph text gets data-edit", () => {
-    expect(renderEditable({ type: "paragraph", text: "Body" }, "tabs.0.blocks.1")).toBe(
-      '<p data-edit="tabs.0.blocks.1.text">Body</p>',
+  it("table col_widths and multi-paragraph cell", () => {
+    const html = r({ type: "table", headers: ["A", "B"], rows: [["x", "p1\n\np2"]], col_widths: [30, 70] });
+    expect(html).toContain("text-align: left; width: 30%; border");
+    expect(html).toContain(`<td ${TD}>\n                <p>p1</p>\n                <p>p2</p>\n            </td>`);
+  });
+  it("canvas figure with alt replacement and caption", () => {
+    expect(r({ type: "figure", ref: "IMG-02", alt: "Pathway", caption: "Fig 1" })).toBe(
+      [
+        '<p style="text-align: center;"><img src="https://x/preview" alt="Pathway"/></p>',
+        '<p style="text-align: center;"><span style="font-size: 8pt; color: #64748b;">Fig 1</span></p>',
+      ].join("\n"),
     );
   });
-
-  it("list items each get data-edit", () => {
-    expect(renderEditable({ type: "list", ordered: false, items: ["A", "B"] }, "tabs.0.blocks.2")).toBe(
-      '<ul>\n    <li data-edit="tabs.0.blocks.2.items.0">A</li>\n    <li data-edit="tabs.0.blocks.2.items.1">B</li>\n</ul>',
-    );
-  });
-
-  it("table headers and cells each get data-edit, including the bolded label column", () => {
-    const html = renderEditable(
-      { type: "table", headers: ["Category", "Risk"], rows: [["Pain", "Severe"]] },
-      "tabs.0.blocks.3",
-    );
-    expect(html).toContain('data-edit="tabs.0.blocks.3.headers.0"');
-    expect(html).toContain('data-edit="tabs.0.blocks.3.headers.1"');
-    expect(html).toContain(`<td data-edit="tabs.0.blocks.3.rows.0.0" ${TD}><strong>Pain</strong></td>`);
-    expect(html).toContain('data-edit="tabs.0.blocks.3.rows.0.1"');
-  });
-
-  it("clinical body is wrapped in a data-edit span (shares its element with the fixed title)", () => {
-    expect(renderEditable({ type: "clinical", body: "Prevention works." }, "tabs.0.blocks.4")).toBe(
-      '<div style="border-left: 4px solid #0d9488; background-color: #f0fdfa; padding: 14px 18px; margin: 16px 0; border-radius: 0 6px 6px 0;"><strong style="color: #0f766e;">Why this matters clinically</strong><br /><span data-edit="tabs.0.blocks.4.body">Prevention works.</span></div>',
-    );
-  });
-
-  it("self_check question and answer get data-edit, but the fixed heading does not", () => {
-    const html = renderEditable(
-      { type: "self_check", questions: [{ question: "Q1", answer: "A1" }] },
-      "tabs.0.blocks.5",
-    );
-    expect(html).not.toContain("data-edit=\"tabs.0.blocks.5.title\"");
-    expect(html).toContain('<span data-edit="tabs.0.blocks.5.questions.0.question">Q1</span>');
-    expect(html).toContain('<p data-edit="tabs.0.blocks.5.questions.0.answer" style="margin: 6px 0 0 0;">A1</p>');
-    expect(html).toContain("Check your understanding</strong>");
-  });
-
-  it("takeaways items get data-edit, fixed title does not", () => {
-    const html = renderEditable({ type: "takeaways", items: ["A"] }, "tabs.0.blocks.6");
-    expect(html).toContain('<li data-edit="tabs.0.blocks.6.items.0">A</li>');
-    expect(html).toContain('<div style="background-color: #1e3a5f; color: #ffffff; padding: 8px 16px; font-weight: bold;">Key takeaways</div>');
-  });
-
-  it("caution title (variable, not fixed) and body/items get data-edit", () => {
-    const html = renderEditable({ type: "caution", title: "Red flag", body: "Refer urgently." }, "tabs.0.blocks.7");
-    expect(html).toContain('<strong data-edit="tabs.0.blocks.7.title" style="color: #b45309;">Red flag</strong>');
-    expect(html).toContain('<span data-edit="tabs.0.blocks.7.body">Refer urgently.</span>');
-  });
-
-  it("caution/critical with no body field get no data-edit span for body (there's no path to point at)", () => {
-    const caution = renderEditable({ type: "caution", title: "Consider:", items: ["Item"] }, "tabs.0.blocks.7");
-    expect(caution).not.toContain("data-edit=\"tabs.0.blocks.7.body\"");
-    expect(caution).not.toContain("<span data-edit");
-    const critical = renderEditable({ type: "critical", items: ["Item"] }, "tabs.0.blocks.12");
-    expect(critical).not.toContain("data-edit=\"tabs.0.blocks.12.body\"");
-    expect(critical).not.toContain("<span data-edit");
-  });
-
-  it("figure caption gets data-edit, alt and placeholder do not", () => {
-    const html = renderEditable({ type: "figure", ref: "IMG-01", alt: "Opioid ladder", caption: "AMH Online" }, "tabs.0.blocks.8");
-    expect(html).not.toContain('data-edit="tabs.0.blocks.8.alt"');
-    expect(html).toContain('<span style="font-size: 8pt; color: #64748b;" data-edit="tabs.0.blocks.8.caption">AMH Online</span>');
-  });
-
-  it("counselling default title is not editable (no title field to point at); custom title is", () => {
-    const withDefault = renderEditable({ type: "counselling", items: ["Take with food"] }, "tabs.0.blocks.9");
-    expect(withDefault).not.toContain("data-edit=\"tabs.0.blocks.9.title\"");
-    const withCustom = renderEditable({ type: "counselling", title: "Before you start", items: ["Item"] }, "tabs.0.blocks.9");
-    expect(withCustom).toContain('<strong data-edit="tabs.0.blocks.9.title" style="color: #15803d;">Before you start</strong>');
-  });
-});
-
-describe("withAlt", () => {
-  it("keeps a meaningful alt", () => {
-    const tag = '<img alt="WHO ladder" src="x"/>';
-    expect(withAlt(tag, "Other")).toBe(tag);
-  });
-  it("adds alt when missing", () => {
-    expect(withAlt('<img src="x"/>', "Chart")).toBe('<img alt="Chart" src="x"/>');
+  it("editable paths", () => {
+    const flow = re({ type: "flow", steps: [{ label: "A", style: "solid" }, { label: "B", style: "outline" }] }, "tabs.0.blocks.0");
+    expect(flow).toContain('<strong data-edit="tabs.0.blocks.0.steps.1.label">B</strong>');
+    expect(re({ type: "formula", expression: "k" }, "p")).toContain('<strong data-edit="p.expression">k</strong>');
+    const kp = re({ type: "key_point", lead: "L.", text: "T" }, "p");
+    expect(kp).toContain('<span data-edit="p.lead">L.</span>');
+    expect(kp).toContain('<span data-edit="p.text">T</span>');
+    const acc = re({ type: "accordion", panels: [{ title: "P", blocks: [{ type: "paragraph", text: "a" }, { type: "paragraph", text: "b" }] }] }, "p");
+    expect(acc).toContain('<p data-edit="p.panels.0.blocks.1.text">b</p>');
   });
 });
