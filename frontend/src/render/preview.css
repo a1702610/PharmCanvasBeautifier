@@ -49,8 +49,8 @@
 .canvas-preview .dp-accordion-default > .dp-panel-group > .dp-panel-heading {
   margin: 0; padding: 10px 14px; background: #f4f2fb; color: #140f50; font-size: 1rem; font-weight: 700; cursor: pointer;
 }
-.canvas-preview .dp-accordion-default > .dp-panel-group > .dp-panel-heading::before { content: "B8  "; }
-.canvas-preview .dp-accordion-default > .dp-panel-group.is-open > .dp-panel-heading::before { content: "BE  "; }
+.canvas-preview .dp-accordion-default > .dp-panel-group > .dp-panel-heading::before { content: "\25B8  "; }
+.canvas-preview .dp-accordion-default > .dp-panel-group.is-open > .dp-panel-heading::before { content: "\25BE  "; }
 .canvas-preview .dp-accordion-default > .dp-panel-group > .dp-panel-content { display: none; padding: 4px 16px 8px; }
 .canvas-preview .dp-accordion-default > .dp-panel-group.is-open > .dp-panel-content { display: block; }
 

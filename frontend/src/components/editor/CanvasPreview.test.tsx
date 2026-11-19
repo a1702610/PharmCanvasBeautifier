@@ -257,3 +257,30 @@ describe("CanvasPreview: tabs and accordions", () => {
     container.remove();
   });
 });
+
+describe("CanvasPreview: open accordions survive an external re-render", () => {
+  it("keeps the same accordion group open after html changes", () => {
+    const build = (text: string) =>
+      `<div class="dp-panels-wrapper dp-tabs-buttons-vertical"><div class="dp-panel-group"><h3 class="dp-panel-heading">1. A</h3><div class="dp-panel-content">` +
+      `<div class="dp-panels-wrapper dp-accordion-default">` +
+      `<div class="dp-panel-group"><h4 class="dp-panel-heading">One</h4><div class="dp-panel-content"><p>${text}</p></div></div>` +
+      `<div class="dp-panel-group"><h4 class="dp-panel-heading">Two</h4><div class="dp-panel-content"><p>${text}</p></div></div>` +
+      `</div></div></div></div>`;
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const mount = (html: string) =>
+      act(() => {
+        root.render(<CanvasPreview html={html} activeIndex={0} editable={false} onSelect={() => {}} onEdit={() => true} />);
+      });
+    mount(build("first"));
+    act(() => (container.querySelectorAll("h4.dp-panel-heading")[1] as HTMLElement).click());
+    mount(build("second"));
+    const groups = container.querySelectorAll(".dp-accordion-default > .dp-panel-group");
+    expect(container.textContent).toContain("second");
+    expect(groups[0].classList.contains("is-open")).toBe(false);
+    expect(groups[1].classList.contains("is-open")).toBe(true);
+    act(() => root.unmount());
+    container.remove();
+  });
+});
