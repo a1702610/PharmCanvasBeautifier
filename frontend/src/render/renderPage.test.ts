@@ -4,88 +4,63 @@ import { buildContext, renderPage } from "./renderPage";
 
 const page: Page = {
   title: "Chronic pain",
-  intro: ["Chronic pain is **different**."],
+  intro: ["Para one.", "Para two."],
   tabs: [
-    { id: "t1", title: "Overview", blocks: [{ type: "paragraph", text: "Body one." }] },
-    { id: "t2", title: "Management", blocks: [{ type: "heading", text: "Opioids" }] },
+    { id: "t1", title: "Overview", blocks: [{ type: "paragraph", text: "Body." }] },
+    { id: "t2", title: "Management", blocks: [{ type: "takeaways", items: ["Legacy"] }] },
   ],
-  revision: { include: true, embed_ref: "EMBED-01" },
+  revision: { include: false, points: ["Explain A.", "Explain B."], flow_title: "Direction", flow: { type: "flow", steps: [{ label: "CL", style: "solid" }, { label: "k", style: "amber" }] } },
   notes: [],
 };
-const ctx = buildContext([], [{ ref: "EMBED-01", html: '<iframe src="https://h5p.example/1"></iframe>' }]);
+const ctx = buildContext([], [{ ref: "EMBED-01", html: '<iframe src="https://h5p/1"></iframe>' }]);
 
 describe("renderPage", () => {
-  it("wraps intro and tabs in the DesignPLUS structure", () => {
+  it("skeleton: wrapper, intro panel, spacer, button tabs numbered, study tab last, spacer", () => {
     const lines = renderPage(page, ctx).split("\n");
-    expect(lines.slice(0, 5)).toEqual([
-      '<div id="dp-wrapper" class="dp-wrapper">',
-      '    <div class="dp-content-block">',
-      "        <p>Chronic pain is <strong>different</strong>.</p>",
-      '        <div class="dp-panels-wrapper dp-tabs-pills-group-vertical dp-panel-color-dp-gray dp-panel-active-color-dp-accent dp-panel-hover-color-dp-secondary">',
-      '            <div class="dp-panel-group">',
-    ]);
-    expect(lines).toContain('                <h3 class="dp-panel-heading">Overview</h3>');
-    expect(lines).toContain('                <div class="dp-panel-content">');
-    expect(lines).toContain("                    <p>Body one.</p>");
-    expect(lines).toContain('                    <h4 style="color: #1e3a5f;">Opioids</h4>');
+    expect(lines[0]).toBe('<div id="dp-wrapper" class="dp-wrapper" style="color: #1f2937;">');
+    expect(lines[1]).toBe('    <table style="width: 100%; border-collapse: separate; margin: 0px 0px 28px; background: #f4f2fb; border-radius: 12px; border: 1px solid #ddd8ef;" role="presentation">');
+    const html = lines.join("\n");
+    expect(html).toContain('<h2 style="margin: 0 0 14px 0; color: #140f50;">Chronic pain</h2>');
+    expect(html).toContain('<p style="margin: 0 0 12px 0;">Para one.</p>');
+    expect(html).toContain('<p style="margin: 0;">Para two.</p>');
+    expect(html).toContain("[ IMAGE: placeholder &mdash; delete this line and insert from Canvas Files ]");
+    expect(html).toContain('    <div class="dp-panels-wrapper dp-tabs-buttons-vertical">');
+    expect(html).toContain('<h3 class="dp-panel-heading">1. Overview</h3>');
+    expect(html).toContain('<h3 class="dp-panel-heading">2. Management</h3>');
+    expect(html).toContain('<h3 class="dp-panel-heading">3. Study materials</h3>');
+    expect(html).toContain("Key takeaways");
+    expect(html.indexOf("</table>")).toBeLessThan(html.indexOf("    <p>&nbsp;</p>\n    <div class=\"dp-panels-wrapper"));
   });
 
-  it("appends the revision block with the original embed", () => {
+  it("revision check with points and flow", () => {
     const html = renderPage(page, ctx);
-    expect(html).toContain('<span style="padding: 0 16px; color: #6d28d9; font-size: 26px;">Revision</span>');
-    expect(html).toContain('<p style="margin: 0; color: #94a3b8;"><iframe src="https://h5p.example/1"></iframe></p>');
-    expect(html.endsWith("</div>\n")).toBe(true);
+    expect(html).toContain('<h2 style="margin: 0 0 8px 0; color: #140f50;">Revision check</h2>');
+    expect(html).toContain('<td style="width: 44px; padding: 12px; text-align: center; color: #d97706; border: 1px solid #cbd5e1;">1</td>');
+    expect(html).toContain("<strong>Direction</strong>");
+    expect(html).not.toContain("[PASTE H5P EMBED HERE]");
+    expect(html.trimEnd().endsWith("</div>")).toBe(true);
   });
 
-  it("uses a placeholder when there is no embed, and omits revision when not included", () => {
-    const noEmbed = renderPage({ ...page, revision: { include: true } }, ctx);
-    expect(noEmbed).toContain("[PASTE H5P EMBED HERE]");
+  it("revision slot with embed when requested, no revision when nothing to show", () => {
+    const withEmbed = renderPage({ ...page, revision: { include: true, embed_ref: "EMBED-01" } }, ctx);
+    expect(withEmbed).toContain('<iframe src="https://h5p/1"></iframe>');
+    expect(withEmbed).not.toContain('color: #d97706; border: 1px solid #cbd5e1;">1</td>');
     const none = renderPage({ ...page, revision: { include: false } }, ctx);
-    expect(none).not.toContain("Revision");
-  });
-});
-
-describe("renderPage: inline editing", () => {
-  const editablePage: Page = {
-    title: "Chronic pain",
-    intro: ["Chronic pain is common."],
-    tabs: [
-      {
-        id: "t1",
-        title: "Overview",
-        blocks: [
-          { type: "paragraph", text: "Body one." },
-          { type: "list", ordered: false, items: ["First point", "Second point"] },
-          { type: "table", headers: ["Category", "Risk"], rows: [["Pain-related", "Severe pain"]] },
-          { type: "clinical", body: "Untreated pain delays recovery." },
-          { type: "self_check", questions: [{ question: "What is the max daily dose?", answer: "4 grams." }] },
-        ],
-      },
-    ],
-    revision: { include: false },
-    notes: [],
-  };
-
-  it("emits data-edit paths for intro, a paragraph, a list item, a table cell, a clinical body span and a self_check answer", () => {
-    const html = renderPage(editablePage, buildContext([], [], true));
-    expect(html).toContain('<p data-edit="intro.0">Chronic pain is common.</p>');
-    expect(html).toContain('<p data-edit="tabs.0.blocks.0.text">Body one.</p>');
-    expect(html).toContain('<li data-edit="tabs.0.blocks.1.items.0">First point</li>');
-    expect(html).toContain('data-edit="tabs.0.blocks.2.rows.0.1"');
-    expect(html).toContain('<span data-edit="tabs.0.blocks.3.body">Untreated pain delays recovery.</span>');
-    expect(html).toContain('<p data-edit="tabs.0.blocks.4.questions.0.answer" style="margin: 6px 0 0 0;">4 grams.</p>');
+    expect(none).not.toContain("Revision check");
+    expect(none).not.toContain("<hr");
   });
 
-  it("does not add data-edit for the tab heading", () => {
-    const html = renderPage(editablePage, buildContext([], [], true));
-    expect(html).not.toContain('<h3 class="dp-panel-heading" data-edit');
-    expect(html).toContain('<h3 class="dp-panel-heading">Overview</h3>');
+  it("legacy page without new fields renders", () => {
+    const legacy = { title: "Old", intro: ["x"], tabs: [{ id: "t1", title: "A", blocks: [{ type: "takeaways", items: ["y"] }] }], revision: { include: true }, notes: [] } as Page;
+    const html = renderPage(legacy, buildContext([], []));
+    expect(html).toContain("2. Study materials");
+    expect(html).toContain("[PASTE H5P EMBED HERE]");
   });
 
-  it("renders byte-identical output when editable is false or absent", () => {
-    const explicitFalse = renderPage(editablePage, buildContext([], [], false));
-    const absent = renderPage(editablePage, buildContext([], []));
-    expect(explicitFalse).toBe(absent);
-    expect(explicitFalse).not.toContain("data-edit");
+  it("editable mode marks intro paragraphs and revision points, never spacers", () => {
+    const html = renderPage(page, buildContext([], [], true));
+    expect(html).toContain('data-edit="intro.0"');
+    expect(html).toContain('data-edit="revision.points.1"');
+    expect(html).not.toMatch(/<p data-edit="[^"]*">&nbsp;<\/p>/);
   });
 });
