@@ -1,6 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { EmbedInfo, ImageInfo } from "../types/api";
 import type { Page, Tab } from "../types/page";
+import type { Course } from "./courses";
 
 export interface SavedPage {
   id: string;
@@ -12,6 +13,7 @@ export interface SavedPage {
   images: ImageInfo[];
   embeds: EmbedInfo[];
   history: Record<string, Tab[]>;
+  courseId?: string;
 }
 
 export interface PageSummary {
@@ -23,14 +25,16 @@ export interface PageSummary {
 
 interface Schema extends DBSchema {
   pages: { key: string; value: SavedPage };
+  courses: { key: string; value: Course };
 }
 
 let dbPromise: Promise<IDBPDatabase<Schema>> | null = null;
 
-function db(): Promise<IDBPDatabase<Schema>> {
-  dbPromise ??= openDB<Schema>("pharm-canvas", 1, {
-    upgrade(database) {
-      database.createObjectStore("pages", { keyPath: "id" });
+export function db(): Promise<IDBPDatabase<Schema>> {
+  dbPromise ??= openDB<Schema>("pharm-canvas", 2, {
+    upgrade(database, oldVersion) {
+      if (oldVersion < 1) database.createObjectStore("pages", { keyPath: "id" });
+      if (oldVersion < 2) database.createObjectStore("courses", { keyPath: "id" });
     },
   });
   return dbPromise;
