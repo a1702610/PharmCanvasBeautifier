@@ -177,3 +177,14 @@ describe("setAtPath", () => {
 it("maps sub and sup back to ~ and ^", () => {
   expect(htmlToMarkdown(el("t<sub>1/2</sub> = ln(2) &times; V<sub>d</sub> / CL; e<sup>−kt</sup>"))).toBe("t~1/2~ = ln(2) × V~d~ / CL; e^−kt^");
 });
+
+describe("bullet lists inside a field", () => {
+  it("turns <ul><li> into '- ' lines", () => {
+    expect(htmlToMarkdown(el("Intro<ul><li>a</li><li><b>b</b></li></ul>"))).toBe("Intro\n- a\n- **b**");
+    expect(htmlToMarkdown(el("Hello<br><ul><li>x</li></ul>"))).toBe("Hello\n- x");
+    expect(htmlToMarkdown(el("<p>Intro</p><ul><li>a</li></ul>"))).toBe("Intro\n\n- a");
+  });
+  it("drops empty bullets", () => {
+    expect(htmlToMarkdown(el("<ul><li>a</li><li><br></li></ul>"))).toBe("- a");
+  });
+});

@@ -1,6 +1,6 @@
 import type { Block, EvidenceChild, FigureBlock, FlowBlock, FlowStep } from "../types/page";
 import type { ImageInfo } from "../types/api";
-import { escapeAttr, escapeText, renderInline, splitParagraphs } from "./inline";
+import { bulletRuns, escapeAttr, escapeText, hasBulletLines, renderInline, splitParagraphs } from "./inline";
 
 export interface RenderContext {
   images: Record<string, ImageInfo>;
@@ -63,11 +63,24 @@ const join = (base: string | undefined, key: string | number) => (base === undef
 const pct = (n: number) => `${Number(n.toFixed(2))}%`;
 const stripBold = (s: string) => s.replace(/^\*\*([\s\S]*)\*\*$/, "$1");
 
+/** Block HTML for text that may contain "- " bullet lines: plain runs become paragraphs
+ *  (opened with `pOpen`), bullet runs become a list. */
+function richLines(text: string, pOpen = "<p>"): string[] {
+  return splitParagraphs(text).flatMap((para) =>
+    bulletRuns(para).flatMap((run) =>
+      run.bullets
+        ? [`<ul style="${LIST_IN_CALLOUT}">`, ...indent(run.lines.map((line) => `<li>${renderInline(line)}</li>`)), "</ul>"]
+        : [`${pOpen}${renderInline(run.lines.join("\n"))}</p>`],
+    ),
+  );
+}
+
 function cellLines(tag: "td" | "th", style: string, content: string, ctx: RenderContext, path?: string, extra = ""): string[] {
   const paras = splitParagraphs(content);
-  const open = `<${tag}${editAttr(ctx, path)} style="${style}"${extra}>`;
-  if (paras.length <= 1) return [`${open}${renderInline(paras[0] ?? "")}</${tag}>`];
-  return [open, ...indent(paras.map((p) => `<p>${renderInline(p)}</p>`)), `</${tag}>`];
+  const bullets = ctx.editable && path ? ' data-bullets="1"' : "";
+  const open = `<${tag}${editAttr(ctx, path)}${bullets} style="${style}"${extra}>`;
+  if (paras.length <= 1 && !hasBulletLines(content)) return [`${open}${renderInline(paras[0] ?? "")}</${tag}>`];
+  return [open, ...indent(richLines(content)), `</${tag}>`];
 }
 
 /** A table with one header row (primary = deep purple, secondary = dark amber) and optional row labels. */
@@ -184,9 +197,31 @@ export function flowRowLines(flow: FlowBlock, ctx: RenderContext, path?: string)
 }
 
 /** Title-led callout: body-only → single line; with items → title paragraph, optional body paragraph, list. */
+/** Callout text that holds "- " bullet lines: the editable wrapper (edit mode) around its paragraphs and list. */
+function richBody(ctx: RenderContext, path: string | undefined, text: string): string[] {
+  const lines = richLines(text, '<p style="margin: 0 0 6px 0;">');
+  return ctx.editable && path ? [`<div data-edit="${escapeAttr(path)}" data-bullets="1">`, ...indent(lines), "</div>"] : lines;
+}
+
+/** Editable callout text that can take bullets (the "- " typed at a line start becomes one). */
+function bodySpan(ctx: RenderContext, path: string | undefined, text: string): string {
+  return ctx.editable && path ? `<span data-edit="${escapeAttr(path)}" data-bullets="1">${renderInline(text)}</span>` : renderInline(text);
+}
+
 function titledCallout(style: string, title: string, titleColor: string | undefined, ctx: RenderContext, path: string | undefined, opts: { titlePath?: string; body?: string; items?: string[] }): string[] {
   const strong = `<strong${editAttr(ctx, opts.titlePath)}${titleColor ? ` style="color: ${titleColor};"` : ""}>${renderInline(title)}</strong>`;
-  const bodyHtml = opts.body !== undefined ? editSpan(ctx, join(path, "body"), renderInline(opts.body)) : "";
+  if (opts.body !== undefined && hasBulletLines(opts.body)) {
+    return [
+      `<div style="${style}">`,
+      ...indent([
+        `<p style="margin: 0 0 8px 0;">${strong}</p>`,
+        ...richBody(ctx, join(path, "body"), opts.body),
+        ...(opts.items?.length ? listLines(opts.items, false, ctx, join(path, "items"), LIST_IN_CALLOUT) : []),
+      ]),
+      "</div>",
+    ];
+  }
+  const bodyHtml = opts.body !== undefined ? bodySpan(ctx, join(path, "body"), opts.body) : "";
   if (!opts.items?.length) return [`<div style="${style}"><p style="margin: 0;">${strong}${bodyHtml ? ` ${bodyHtml}` : ""}</p></div>`];
   return [
     `<div style="${style}">`,
@@ -325,8 +360,15 @@ export function blockLines(block: Block, ctx: RenderContext, path?: string): str
         "</div>",
       ];
     case "key_point": {
-      const lead = block.lead !== undefined ? `<strong>${editSpan(ctx, join(path, "lead"), renderInline(block.lead))}</strong> ` : "";
-      return [`<div style="${lr(P.purple, P.lavender)}"><p style="margin: 0;">${lead}${editSpan(ctx, join(path, "text"), renderInline(block.text))}</p></div>`];
+      const lead = block.lead !== undefined ? `<strong>${editSpan(ctx, join(path, "lead"), renderInline(block.lead))}</strong>` : "";
+      if (hasBulletLines(block.text)) {
+        return [
+          `<div style="${lr(P.purple, P.lavender)}">`,
+          ...indent([...(lead ? [`<p style="margin: 0 0 8px 0;">${lead}</p>`] : []), ...richBody(ctx, join(path, "text"), block.text)]),
+          "</div>",
+        ];
+      }
+      return [`<div style="${lr(P.purple, P.lavender)}"><p style="margin: 0;">${lead ? `${lead} ` : ""}${bodySpan(ctx, join(path, "text"), block.text)}</p></div>`];
     }
     case "clinical":
       return titledCallout(lr(P.amber, P.amberPale), "Why this matters clinically:", undefined, ctx, path, { body: block.body });

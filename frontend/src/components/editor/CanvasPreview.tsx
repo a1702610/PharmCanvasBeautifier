@@ -11,6 +11,7 @@ import {
   type MouseEvent,
 } from "react";
 import { collapseNewlines, htmlToMarkdown } from "../../render/editing";
+import { BULLET_LINE, hasBulletLines } from "../../render/inline";
 import "../../render/preview.css";
 import { sanitizePreviewHtml } from "../../render/sanitize";
 
@@ -22,7 +23,7 @@ export type PreviewAction =
   | { kind: "delete-column"; path: string; index: number }
   // Typing (see the data-enter / data-autolist markers in templates.ts):
   | { kind: "split"; path: string; before: string; after: string }
-  | { kind: "to-list"; path: string; text: string }
+  | { kind: "to-list"; path: string; text: string; caretLine?: number }
   | { kind: "remove-empty"; path: string };
 
 /** Ask the preview to put the caret in the field at `path` after the next render (e.g. the new
@@ -87,6 +88,51 @@ function setCaretOffset(container: HTMLElement, offset: number) {
   range.collapse(true);
   sel.removeAllRanges();
   sel.addRange(range);
+}
+
+/** The text node holding the caret, when the caret sits right after a "- " / "* " / "• " typed
+ *  at the start of a line (the field's start, or just after a line break). */
+function typedBulletMarker(field: HTMLElement): { node: Text; offset: number } | null {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  const node = range.startContainer;
+  if (!range.collapsed || node.nodeType !== Node.TEXT_NODE || !field.contains(node)) return null;
+  const text = node as Text;
+  if (!/^[-*\u2022][ \u00a0]$/.test(text.data.slice(0, range.startOffset))) return null;
+  const prev = text.previousSibling;
+  const atLineStart = prev ? prev.nodeName === "BR" : text.parentNode === field;
+  return atLineStart ? { node: text, offset: range.startOffset } : null;
+}
+
+/** Markdown of the field's content between two points (null = the field's start / end). */
+function markdownOfRange(field: HTMLElement, from: { node: Node; offset: number } | null, toBefore: Node | null): string {
+  const range = document.createRange();
+  range.selectNodeContents(field);
+  if (from) range.setStart(from.node, from.offset);
+  if (toBefore) range.setEndBefore(toBefore);
+  const holder = document.createElement("div");
+  holder.appendChild(range.cloneContents());
+  return htmlToMarkdown(holder);
+}
+
+/** Replaces a just-typed "- " line start with a one-bullet list holding the rest of that text,
+ *  and puts the caret in the bullet. */
+function makeBulletInPlace(node: Text, offset: number) {
+  const rest = node.data.slice(offset);
+  const ul = document.createElement("ul");
+  const li = document.createElement("li");
+  if (rest) li.textContent = rest;
+  else li.appendChild(document.createElement("br"));
+  ul.appendChild(li);
+  if (node.previousSibling?.nodeName === "BR") node.previousSibling.remove();
+  node.replaceWith(ul);
+  const caret = document.createRange();
+  caret.setStart(li, 0);
+  caret.collapse(true);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(caret);
 }
 
 /** The field's text before and after the caret, as inline markdown (formatting kept). */
@@ -280,6 +326,12 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit, o
     const path = target?.getAttribute("data-edit");
     if (target && path && focusValue.current !== null) {
       const value = htmlToMarkdown(target);
+      if (target.dataset.autolist && onAction && hasBulletLines(value)) {
+        // A paragraph with "- " lines (e.g. typed after Shift+Enter) becomes text + a bullet list.
+        forgetFocusedValue();
+        onAction({ kind: "to-list", path, text: value });
+        return;
+      }
       if (value === "") {
         // Don't save an empty edit; put back what was there before.
         if (focusHtml.current !== null) target.innerHTML = focusHtml.current;
@@ -322,6 +374,10 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit, o
     if (!field || !path) return;
     const enter = field.dataset.enter;
     if (e.key === "Enter") {
+      // Inside a bullet list within a cell or callout, the browser's own Enter adds the next
+      // bullet (or ends the list on an empty one).
+      const li = (e.target as HTMLElement).closest("li");
+      if (li && field.contains(li) && field.dataset.bullets) return;
       e.preventDefault();
       if (enter === "none") return;
       if (enter === "split" && !e.shiftKey && onAction) {
@@ -340,13 +396,27 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit, o
     }
   }
 
+  // "- " (or "* ", "• ") typed at the start of a line becomes a bullet: in a paragraph the
+  // paragraph is split into text + a bullet list; in a cell or callout a list is made in place.
   function handleInput(e: FormEvent<HTMLDivElement>) {
-    if (!editable || !onAction) return;
-    const field = (e.target as HTMLElement).closest<HTMLElement>("[data-autolist]");
+    if (!editable) return;
+    const field = (e.target as HTMLElement).closest<HTMLElement>("[data-edit]");
     const path = field?.getAttribute("data-edit");
-    if (!field || !path || !/^[-*\u2022][\s\u00a0]/.test(field.textContent ?? "")) return;
-    forgetFocusedValue();
-    onAction({ kind: "to-list", path, text: htmlToMarkdown(field).replace(/^[-*\u2022]\s*/, "") });
+    if (!field || !path) return;
+    const marker = typedBulletMarker(field);
+    if (field.dataset.autolist && onAction) {
+      if (marker) {
+        const before = markdownOfRange(field, null, marker.node);
+        const after = markdownOfRange(field, { node: marker.node, offset: marker.offset }, null);
+        forgetFocusedValue();
+        onAction({ kind: "to-list", path, text: `${before ? `${before}\n` : ""}- ${after}`, caretLine: before ? before.split("\n").length : 0 });
+      } else if (BULLET_LINE.test(field.textContent ?? "")) {
+        forgetFocusedValue();
+        onAction({ kind: "to-list", path, text: htmlToMarkdown(field), caretLine: 0 });
+      }
+    } else if (marker && field.dataset.bullets) {
+      makeBulletInPlace(marker.node, marker.offset);
+    }
   }
 
   function insertPlainText(raw: string) {

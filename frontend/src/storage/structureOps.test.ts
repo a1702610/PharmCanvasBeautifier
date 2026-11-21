@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { InnerBlock, Page } from "../types/page";
 import { buildContext, renderPage } from "../render/renderPage";
-import { addColumn, addTab, blankPage, blockChoices, insertBlock, newBlock, newListItem, newPanel, removeColumn, removeEmpty, removeItem, removeTab, splitText, toBulletList } from "./structureOps";
+import { addColumn, addTab, blankPage, blockChoices, insertBlock, newBlock, newListItem, newPanel, removeColumn, paragraphLinesToBlocks, removeEmpty, removeItem, removeTab, splitText } from "./structureOps";
 
 const p = (text: string): InnerBlock => ({ type: "paragraph", text });
 const page: Page = {
@@ -249,14 +249,14 @@ describe("typing: Enter splits, '- ' makes bullets, Backspace removes empties", 
   });
 
   it("'- ' at the start of a paragraph turns it into a bullet list", () => {
-    const { page: next, focus } = toBulletList(typing, "tabs.0.blocks.0.text", "Hello world");
+    const { page: next, focus } = paragraphLinesToBlocks(typing, "tabs.0.blocks.0.text", "- Hello world", 0);
     expect(blocks(next)[0]).toEqual({ type: "list", ordered: false, items: ["Hello world"] });
     expect(focus).toEqual({ path: "tabs.0.blocks.0.items.0", caret: "start" });
   });
 
   it("'- ' in a paragraph right after a bullet list adds to that list", () => {
     const afterList: Page = { ...typing, tabs: [{ ...typing.tabs[0], blocks: [blocks(typing)[1], { type: "paragraph", text: "c" }] }] };
-    const { page: next, focus } = toBulletList(afterList, "tabs.0.blocks.1.text", "c");
+    const { page: next, focus } = paragraphLinesToBlocks(afterList, "tabs.0.blocks.1.text", "- c", 0);
     expect(blocks(next)).toEqual([{ type: "list", ordered: false, items: ["a", "b", "c"] }]);
     expect(focus).toEqual({ path: "tabs.0.blocks.0.items.2", caret: "start" });
   });
@@ -282,5 +282,27 @@ describe("typing: Enter splits, '- ' makes bullets, Backspace removes empties", 
     const two = splitText(typing, "intro.0", "Intro one", "").page;
     expect(removeEmpty(two, "intro.1").page.intro).toEqual(["Intro one"]);
     expect(removeEmpty(typing, "intro.0").page.intro).toEqual(["Intro one"]);
+  });
+});
+
+describe("paragraphLinesToBlocks", () => {
+  const one = (text: string): Page => ({ title: "T", intro: [], tabs: [{ id: "t1", title: "A", blocks: [{ type: "paragraph", text }] }], revision: { include: false }, notes: [] });
+  const blocksOf = (p: Page) => p.tabs[0].blocks;
+
+  it("splits a paragraph's '- ' / '* ' lines into a bullet list after the text", () => {
+    const { page, focus } = paragraphLinesToBlocks(one(""), "tabs.0.blocks.0.text", "Hello\n* a\n- b");
+    expect(blocksOf(page)).toEqual([{ type: "paragraph", text: "Hello" }, { type: "list", ordered: false, items: ["a", "b"] }]);
+    expect(focus).toBeUndefined();
+  });
+
+  it("keeps text after the bullets as a paragraph", () => {
+    const { page } = paragraphLinesToBlocks(one(""), "tabs.0.blocks.0.text", "- a\nAfter\nmore");
+    expect(blocksOf(page)).toEqual([{ type: "list", ordered: false, items: ["a"] }, { type: "paragraph", text: "After\nmore" }]);
+  });
+
+  it("focuses the bullet on the caret's line", () => {
+    const { page, focus } = paragraphLinesToBlocks(one(""), "tabs.0.blocks.0.text", "Hello\n- ", 1);
+    expect(blocksOf(page)).toEqual([{ type: "paragraph", text: "Hello" }, { type: "list", ordered: false, items: [""] }]);
+    expect(focus).toEqual({ path: "tabs.0.blocks.1.items.0", caret: "start" });
   });
 });

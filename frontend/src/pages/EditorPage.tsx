@@ -20,12 +20,12 @@ import {
   newBlock,
   newListItem,
   newPanel,
+  paragraphLinesToBlocks,
   removeColumn,
   removeEmpty,
   removeItem,
   removeTab,
   splitText,
-  toBulletList,
 } from "../storage/structureOps";
 import type { Block, Page, StudyMaterials } from "../types/page";
 import { buildImagesZip, downloadBlob, safeFilename } from "../utils/downloads";
@@ -183,7 +183,7 @@ export default function EditorPage() {
       case "split":
         return typingChange(action.path, (page) => splitText(page, action.path, action.before, action.after));
       case "to-list":
-        return typingChange(action.path, (page) => toBulletList(page, action.path, action.text));
+        return typingChange(action.path, (page) => paragraphLinesToBlocks(page, action.path, action.text, action.caretLine));
       case "remove-empty":
         return typingChange(action.path, (page) => removeEmpty(page, action.path));
     }

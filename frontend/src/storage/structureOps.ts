@@ -1,3 +1,4 @@
+import { BULLET_LINE } from "../render/inline";
 import type { AccordionBlock, Block, Page, Tab } from "../types/page";
 
 type BlockType = Block["type"];
@@ -288,20 +289,59 @@ function removeEmptyItem(page: Page, listPath: string, i: number): Page {
   return removeItem(page, `${listPath}.${i}`);
 }
 
-/** "- " typed at the start of the paragraph at `path` (`text` is the rest): the paragraph becomes
- *  a bullet, joining a bullet list directly above it if there is one. */
-export function toBulletList(page: Page, path: string, text: string): { page: Page; focus: Focus } {
+/** Turns the paragraph at `path` into blocks from `text`, its lines: runs of "- " / "* " lines
+ *  become bullet lists, other runs stay paragraphs. A list that comes first joins a bullet list
+ *  directly above the paragraph. With `caretLine` (the line the caret is on), the caret goes to
+ *  the start of that line's new paragraph or bullet. */
+export function paragraphLinesToBlocks(page: Page, path: string, text: string, caretLine?: number): { page: Page; focus?: Focus } {
   const match = path.match(BLOCK_TEXT_RE);
   const block = match ? (getAt(page, `${match[1]}.${match[2]}`) as Block | undefined) : undefined;
   if (!match || block?.type !== "paragraph") throw new Error(`Can't make a list from ${path}`);
   const [, list, index] = match;
   const i = Number(index);
-  const prev = i > 0 ? (getAt(page, `${list}.${i - 1}`) as Block | undefined) : undefined;
-  if (prev?.type === "list" && !prev.ordered) {
-    const joined = insertBlock(removeItem(page, `${list}.${i}`), `${list}.${i - 1}.items`, prev.items.length, text);
-    return { page: joined, focus: { path: `${list}.${i - 1}.items.${prev.items.length}`, caret: "start" } };
+
+  // Group the lines, remembering where each original line ends up.
+  type Run = { bullets: boolean; lines: string[] };
+  const runs: Run[] = [];
+  const lineAt: { run: number; item: number }[] = [];
+  for (const raw of text.split("\n")) {
+    const bullet = BULLET_LINE.test(raw);
+    const value = bullet ? raw.replace(BULLET_LINE, "") : raw;
+    let last = runs[runs.length - 1];
+    if (!last || last.bullets !== bullet) runs.push((last = { bullets: bullet, lines: [] }));
+    last.lines.push(value);
+    lineAt.push({ run: runs.length - 1, item: last.lines.length - 1 });
   }
-  return { page: setAt(page, `${list}.${i}`, { type: "list", ordered: false, items: [text] }), focus: { path: `${list}.${i}.items.0`, caret: "start" } };
+  const kept = runs.filter((run) => run.bullets || run.lines.some((line) => line.trim()));
+  const blocks: Block[] = kept.map((run) =>
+    run.bullets
+      ? { type: "list", ordered: false, items: run.lines }
+      : { type: "paragraph", text: run.lines.filter((line) => line.trim()).join("\n") },
+  );
+
+  const prev = i > 0 ? (getAt(page, `${list}.${i - 1}`) as Block | undefined) : undefined;
+  const joinPrev = prev?.type === "list" && !prev.ordered && blocks[0]?.type === "list";
+  let next = removeItem(page, `${list}.${i}`);
+  let at = i;
+  if (joinPrev) {
+    for (const item of (blocks[0] as { items: string[] }).items) {
+      next = insertBlock(next, `${list}.${i - 1}.items`, (getAt(next, `${list}.${i - 1}.items`) as string[]).length, item);
+    }
+  }
+  blocks.slice(joinPrev ? 1 : 0).forEach((b) => {
+    next = insertBlock(next, list, at++, b);
+  });
+
+  if (caretLine === undefined || !lineAt[caretLine]) return { page: next };
+  const where = lineAt[caretLine];
+  const keptIndex = kept.indexOf(runs[where.run]);
+  if (keptIndex < 0) return { page: next };
+  if (!runs[where.run].bullets) return { page: next, focus: { path: `${list}.${i + keptIndex - (joinPrev ? 1 : 0)}.text`, caret: "start" } };
+  if (joinPrev && keptIndex === 0) {
+    const prevCount = prev.items.length;
+    return { page: next, focus: { path: `${list}.${i - 1}.items.${prevCount + where.item}`, caret: "start" } };
+  }
+  return { page: next, focus: { path: `${list}.${i + keptIndex - (joinPrev ? 1 : 0)}.items.${where.item}`, caret: "start" } };
 }
 
 /** Backspace in an empty field at `path`: removes the empty bullet, revision point, paragraph,

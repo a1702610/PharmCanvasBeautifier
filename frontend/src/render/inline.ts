@@ -47,3 +47,24 @@ export function renderInline(src: string): string {
 export function splitParagraphs(s: string): string[] {
   return s.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
 }
+
+/** A line that starts with "- ", "* " or "• " is a bullet point. */
+export const BULLET_LINE = /^[-*\u2022][ \u00a0]/;
+
+export function hasBulletLines(text: string): boolean {
+  return text.split("\n").some((line) => BULLET_LINE.test(line));
+}
+
+/** Groups a text's lines into runs of plain text and runs of bullets (marker removed). */
+export function bulletRuns(text: string): { bullets: boolean; lines: string[] }[] {
+  const runs: { bullets: boolean; lines: string[] }[] = [];
+  for (const line of text.split("\n")) {
+    const bullet = BULLET_LINE.test(line);
+    const value = bullet ? line.replace(BULLET_LINE, "") : line;
+    if (!bullet && !value.trim()) continue;
+    const last = runs[runs.length - 1];
+    if (last && last.bullets === bullet) last.lines.push(value);
+    else runs.push({ bullets: bullet, lines: [value] });
+  }
+  return runs;
+}

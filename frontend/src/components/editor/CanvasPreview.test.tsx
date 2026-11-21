@@ -461,7 +461,7 @@ describe("CanvasPreview: Enter, '- ' and Backspace while typing", () => {
     act(() => {
       p.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    expect(onAction).toHaveBeenCalledWith({ kind: "to-list", path: "tabs.0.blocks.0.text", text: "Hello" });
+    expect(onAction).toHaveBeenCalledWith({ kind: "to-list", path: "tabs.0.blocks.0.text", text: "- Hello", caretLine: 0 });
     done();
   });
 
@@ -488,6 +488,89 @@ describe("CanvasPreview: Enter, '- ' and Backspace while typing", () => {
     render({ path: "tabs.0.blocks.1.body", caret: "end", id: 1 });
     const body = container.querySelector<HTMLElement>('[data-edit="tabs.0.blocks.1.body"]')!;
     expect(document.activeElement).toBe(body);
+    done();
+  });
+});
+
+describe("CanvasPreview: '- ' at the start of a later line", () => {
+  const html =
+    `<p data-edit="tabs.0.blocks.0.text" data-enter="split" data-autolist="1" tabindex="0">Hello</p>` +
+    `<table><tbody><tr><td data-edit="tabs.0.blocks.1.rows.0.0" data-bullets="1" tabindex="0">Cell</td></tr></tbody></table>`;
+
+  function mount(onAction = vi.fn(), onEdit = vi.fn(() => true)) {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(<CanvasPreview html={html} activeIndex={0} editable onSelect={() => {}} onEdit={onEdit} onAction={onAction} />);
+    });
+    return { container, onAction, onEdit, done: () => { act(() => root.unmount()); container.remove(); } };
+  }
+
+  // Simulates typing "- " on a new line: the field holds TEXT<br>"- " with the caret after the space.
+  function typeDashOnNewLine(field: HTMLElement, before: string) {
+    field.innerHTML = `${before}<br>`;
+    const dash = document.createTextNode("- ");
+    field.appendChild(dash);
+    const range = document.createRange();
+    range.setStart(dash, 2);
+    range.collapse(true);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    act(() => {
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
+  it("in a paragraph it asks for the paragraph to become text + bullet list", () => {
+    const { container, onAction, done } = mount();
+    const p = container.querySelector<HTMLElement>('[data-edit="tabs.0.blocks.0.text"]')!;
+    act(() => p.focus());
+    typeDashOnNewLine(p, "Hello");
+    expect(onAction).toHaveBeenCalledWith({ kind: "to-list", path: "tabs.0.blocks.0.text", text: "Hello\n- ", caretLine: 1 });
+    done();
+  });
+
+  it("in a table cell it becomes a bullet right away", () => {
+    const { container, onAction, done } = mount();
+    const td = container.querySelector<HTMLElement>("td")!;
+    act(() => td.focus());
+    typeDashOnNewLine(td, "Cell");
+    expect(onAction).not.toHaveBeenCalled();
+    expect(td.querySelector("ul > li")).not.toBeNull();
+    expect(td.textContent).toBe("Cell");
+    expect(td.innerHTML.startsWith("Cell<ul><li>")).toBe(true);
+    done();
+  });
+
+  it("Enter inside a bullet in a cell is left to the browser (new bullet)", () => {
+    const { container, done } = mount();
+    const td = container.querySelector<HTMLElement>("td")!;
+    td.innerHTML = "Cell<ul><li>a</li></ul>";
+    act(() => td.focus());
+    const li = td.querySelector("li")!;
+    const range = document.createRange();
+    range.setStart(li.firstChild!, 1);
+    range.collapse(true);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+    const event = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+    act(() => {
+      li.dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(false);
+    done();
+  });
+
+  it("leaving a paragraph that has '- ' lines converts it instead of saving the text as-is", () => {
+    const { container, onAction, onEdit, done } = mount();
+    const p = container.querySelector<HTMLElement>('[data-edit="tabs.0.blocks.0.text"]')!;
+    act(() => p.focus());
+    p.innerHTML = "Hello<br>* a<br>- b";
+    act(() => p.blur());
+    expect(onEdit).not.toHaveBeenCalled();
+    expect(onAction).toHaveBeenCalledWith({ kind: "to-list", path: "tabs.0.blocks.0.text", text: "Hello\n* a\n- b" });
     done();
   });
 });

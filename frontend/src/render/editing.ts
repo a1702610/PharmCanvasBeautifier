@@ -46,6 +46,16 @@ function inlineToMarkdown(node: Node): string {
   switch (el.tagName) {
     case "BR":
       return LINE_BREAK;
+    case "UL":
+    case "OL": {
+      // Each non-empty bullet becomes its own "- " line.
+      const items = Array.from(el.children)
+        .filter((child) => child.tagName === "LI")
+        .map((li) => childrenInline(li))
+        .map((text) => text.split(LINE_BREAK).join(" ").trim())
+        .filter(Boolean);
+      return items.map((text) => `${LINE_BREAK}- ${text}`).join("") + LINE_BREAK;
+    }
     case "STRONG":
     case "B":
       return wrapMarker("**", childrenInline(el));
@@ -72,6 +82,7 @@ function inlineToMarkdown(node: Node): string {
  * used by renderInline (**bold**, *italic*, [text](https://url)), per the "Inline text
  * editing" section of callouts-spec.md:
  *   - <strong>/<b> -> **...**, <em>/<i> -> *...*, <a href="https://..."> -> [text](url)
+ *   - <ul>/<ol> items -> one "- item" line each (empty bullets dropped)
  *   - <br> -> a line break ("\n"); several in a row count as one, leading/trailing ones are dropped
  *   - top-level content is split into paragraphs at each <p>/<div> child (a multi-paragraph
  *     table cell, or lines a browser wrapped in <div>s on Enter/paste), joined by "\n\n";

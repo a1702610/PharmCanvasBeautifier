@@ -256,7 +256,7 @@ describe("remaining components", () => {
     expect(re({ type: "formula", expression: "k" }, "p")).toContain('<strong data-edit="p.expression">k</strong>');
     const kp = re({ type: "key_point", lead: "L.", text: "T" }, "p");
     expect(kp).toContain('<span data-edit="p.lead">L.</span>');
-    expect(kp).toContain('<span data-edit="p.text">T</span>');
+    expect(kp).toContain('<span data-edit="p.text" data-bullets="1">T</span>');
     const acc = re({ type: "accordion", panels: [{ title: "P", blocks: [{ type: "paragraph", text: "a" }, { type: "paragraph", text: "b" }] }] }, "p");
     expect(acc).toContain('<p data-edit="p.panels.0.blocks.1.text" data-enter="split" data-autolist="1">b</p>');
   });
@@ -315,7 +315,7 @@ describe("fix round 1 additions", () => {
   it("editable: caution, counselling, figure caption paths", () => {
     const c = re({ type: "caution", title: "T", body: "B", items: ["i"] }, "p");
     expect(c).toContain('<strong data-edit="p.title">T</strong>');
-    expect(c).toContain('<span data-edit="p.body">B</span>');
+    expect(c).toContain('<span data-edit="p.body" data-bullets="1">B</span>');
     expect(c).toContain('<li><span data-edit="p.items.0" data-enter="split">i</span>');
     expect(re({ type: "counselling", items: ["i"] }, "p")).not.toMatch(/data-edit="p\.title"/);
     expect(re({ type: "counselling", title: "Custom", items: ["i"] }, "p")).toContain('<strong data-edit="p.title" style="color: #140f50;">Custom</strong>');
@@ -428,5 +428,51 @@ describe("Enter-key markers (edit mode only)", () => {
     expect(blockLines({ type: "heading", text: "H" }, ed, "tabs.0.blocks.0").join("")).toBe('<h4 data-edit="tabs.0.blocks.0.text" data-enter="split" style="color: #140f50;">H</h4>');
     expect(blockLines({ type: "clinical", body: "B" }, ed, "tabs.0.blocks.0").join("")).not.toContain("data-enter");
     expect(blockLines({ type: "paragraph", text: "P" }, ctx, "tabs.0.blocks.0").join("")).toBe("<p>P</p>");
+  });
+});
+
+describe("bullet lines inside cells and callouts", () => {
+  const ed: RenderContext = { ...ctx, editable: true };
+  it("a table cell with '- ' lines renders a list in the cell", () => {
+    const html = r({ type: "table", headers: ["A"], row_headers: false, rows: [["Intro\n- a\n* **b**"]] });
+    expect(html).toContain(
+      [
+        `<td ${TD}>`,
+        "                <p>Intro</p>",
+        '                <ul style="margin: 0; padding-left: 24px;">',
+        "                    <li>a</li>",
+        "                    <li><strong>b</strong></li>",
+        "                </ul>",
+        "            </td>",
+      ].join("\n"),
+    );
+  });
+
+  it("editable cells and callout text accept bullets", () => {
+    expect(blockLines({ type: "table", headers: ["A"], row_headers: false, rows: [["x"]] }, ed, "p").join("")).toContain('<td data-edit="p.rows.0.0" data-bullets="1" style=');
+    expect(blockLines({ type: "clinical", body: "x" }, ed, "p").join("")).toContain('<span data-edit="p.body" data-bullets="1">x</span>');
+  });
+
+  it("a callout body with '- ' lines puts the title on its own line and lists the bullets", () => {
+    expect(r({ type: "clinical", body: "Watch for:\n- K^+^\n- creatinine" })).toBe(
+      [
+        '<div style="margin: 20px 0; padding: 16px 18px; border-left: 5px solid #d97706; background: #fff7ed;">',
+        '    <p style="margin: 0 0 8px 0;"><strong>Why this matters clinically:</strong></p>',
+        '    <p style="margin: 0 0 6px 0;">Watch for:</p>',
+        '    <ul style="margin: 0; padding-left: 24px;">',
+        "        <li>K<sup>+</sup></li>",
+        "        <li>creatinine</li>",
+        "    </ul>",
+        "</div>",
+      ].join("\n"),
+    );
+    const editable = blockLines({ type: "clinical", body: "- a" }, ed, "p").join("\n");
+    expect(editable).toContain('<div data-edit="p.body" data-bullets="1">');
+  });
+
+  it("a key point with bullets keeps its lead on the first line", () => {
+    const html = r({ type: "key_point", lead: "Remember.", text: "- one\n- two" });
+    expect(html).toContain('<p style="margin: 0 0 8px 0;"><strong>Remember.</strong></p>');
+    expect(html).toContain("<li>one</li>");
   });
 });
