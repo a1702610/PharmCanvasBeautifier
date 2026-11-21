@@ -35,18 +35,3 @@ def build_generate_prompt(
     lines.extend(_course_section(course_context))
     lines.append("SOURCE MATERIAL:\n<<<\n" + text + "\n>>>")
     return "\n\n".join(lines)
-
-
-def build_regenerate_prompt(
-    tab_json: str, other_titles: list[str], intro: list[str], instruction: str, text: str, course_context: str = ""
-) -> str:
-    lines = [
-        "Page introduction:\n" + ("\n".join(intro) if intro else "(none)"),
-        "Other tabs on this page (do not repeat their content): "
-        + (", ".join(other_titles) if other_titles else "(none)"),
-        "Current tab JSON:\n" + tab_json,
-        "Lecturer's instruction for this tab:\n" + instruction.strip(),
-        *_course_section(course_context),
-        "SOURCE MATERIAL:\n<<<\n" + text + "\n>>>",
-    ]
-    return "\n\n".join(lines)

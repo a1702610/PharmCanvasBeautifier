@@ -1,10 +1,7 @@
-import pytest
-
 from app.ai.schema import (
     Counselling, Critical, Figure, Link, Paragraph, Takeaways, Tip, WirePage,
-    WireTab,
 )
-from app.ai.validate import SourceContext, finalize_page, finalize_tab
+from app.ai.validate import SourceContext, finalize_page
 
 SOURCE = (
     "=== SOURCE 1: a.pptx ===\n\n--- Slide 1 ---\n"
@@ -140,12 +137,6 @@ def test_include_revision_request_forces_block():
     assert page.revision.include is True
 
 
-def test_finalize_tab_keeps_id_and_raises_when_empty():
-    t, notes = finalize_tab(WireTab.model_validate(tab("A", P, CLINICAL)), CTX, "t4")
-    assert t.id == "t4" and notes == []
-    with pytest.raises(ValueError):
-        finalize_tab(WireTab.model_validate(tab("A", {"type": "list", "items": []})), CTX, "t4")
-
 
 # ── New block types ──────────────────────────────────────────────────────────
 
@@ -241,18 +232,6 @@ def test_finalize_page_no_note_when_every_tab_has_clinical():
     page = finalize_page(wire([tab("A", P, CLINICAL), tab("B", P, CLINICAL), tab("C", P, CLINICAL)]), CTX, include_revision=False)
     assert not any("clinically" in n.text for n in page.notes)
 
-
-def test_finalize_tab_notes_missing_clinical_callout():
-    t, notes = finalize_tab(WireTab.model_validate(tab("A", P)), CTX, "t4")
-    assert any(
-        n.kind == "flag" and "Tab 'A' has no 'Why this matters clinically' callout." in n.text
-        for n in notes
-    )
-
-
-def test_finalize_tab_no_note_when_clinical_present():
-    t, notes = finalize_tab(WireTab.model_validate(tab("A", P, CLINICAL)), CTX, "t4")
-    assert notes == []
 
 
 # --- PHAR3004 house-style blocks and page fields ---

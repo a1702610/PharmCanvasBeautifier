@@ -5,9 +5,9 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
 from app.ai import gemini
-from app.ai.prompts import build_generate_prompt, build_regenerate_prompt, load_prompt
-from app.ai.schema import Note, Page, Tab, WirePage, WireTab
-from app.ai.validate import SourceContext, finalize_page, finalize_tab
+from app.ai.prompts import build_generate_prompt, load_prompt
+from app.ai.schema import Page, WirePage
+from app.ai.validate import SourceContext, finalize_page
 from app.config import settings
 
 router = APIRouter()
@@ -33,32 +33,9 @@ class GenerateRequest(BaseModel):
         return v.strip()[:12000]
 
 
-class Outline(BaseModel):
-    intro: list[str] = Field(default_factory=list)
-    tab_titles: list[str] = Field(default_factory=list)
-
-
-class RegenerateTabRequest(BaseModel):
-    text: str = Field(min_length=1)
-    images: list[ImageForAI] = Field(default_factory=list)
-    outline: Outline
-    tab: Tab
-    instruction: str = Field(min_length=1)
-    course_context: str = ""
-
-    @field_validator("course_context")
-    @classmethod
-    def _cap_course_context(cls, v: str) -> str:
-        return v.strip()[:12000]
-
-
 class GenerateResponse(BaseModel):
     page: Page
 
-
-class RegenerateTabResponse(BaseModel):
-    tab: Tab
-    notes: list[Note]
 
 
 def _require_key(key: str | None) -> str:
@@ -99,31 +76,3 @@ async def generate(req: GenerateRequest, x_gemini_key: str | None = Header(defau
         page.title = req.title.strip()
     return GenerateResponse(page=page)
 
-
-@router.post("/regenerate-tab", response_model=RegenerateTabResponse, response_model_exclude_none=True)
-async def regenerate_tab(req: RegenerateTabRequest, x_gemini_key: str | None = Header(default=None)):
-    key = _require_key(x_gemini_key)
-    others = [t for t in req.outline.tab_titles if t != req.tab.title]
-    prompt = build_regenerate_prompt(
-        tab_json=req.tab.model_dump_json(exclude_none=True, exclude={"id"}),
-        other_titles=others,
-        intro=req.outline.intro,
-        instruction=req.instruction,
-        text=req.text,
-        course_context=req.course_context,
-    )
-    try:
-        wire = await gemini.generate_structured(
-            api_key=key,
-            system_prompt=load_prompt("system") + "\n\n" + load_prompt("regenerate_tab"),
-            prompt=prompt,
-            images=_image_parts(req.images),
-            schema=WireTab,
-        )
-    except gemini.GeminiError as exc:
-        raise HTTPException(exc.status_code, exc.message)
-    try:
-        tab, notes = finalize_tab(wire, SourceContext.from_text(req.text), req.tab.id)
-    except ValueError:
-        raise HTTPException(502, "The AI returned an empty tab. Please try again.")
-    return RegenerateTabResponse(tab=tab, notes=notes)

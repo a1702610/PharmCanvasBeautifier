@@ -109,7 +109,7 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit }:
   );
 
   // Replaces the container's HTML manually (instead of dangerouslySetInnerHTML) so an
-  // *external* re-render (undo, regenerate, loading another page, toggling Edit text) doesn't
+  // *external* re-render (undo, add/delete, loading another page, toggling Edit text) doesn't
   // blow away another element's in-progress edit and caret position while it still has focus:
   // we snapshot which data-edit path (if any) is currently focused and its caret offset before
   // replacing the DOM, then restore focus/caret to the element with the same path afterward.

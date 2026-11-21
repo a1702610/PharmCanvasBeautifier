@@ -6,11 +6,10 @@ interface Props {
   activeIndex: number;
   historyCounts: Record<string, number>;
   onSelect: (index: number) => void;
-  onRegenerate: (tab: Tab) => void;
   onUndo: (tab: Tab) => void;
 }
 
-export function TabRail({ tabs, activeIndex, historyCounts, onSelect, onRegenerate, onUndo }: Props) {
+export function TabRail({ tabs, activeIndex, historyCounts, onSelect, onUndo }: Props) {
   return (
     <nav aria-label="Page sections">
       <h2 className="px-3 text-xs font-semibold uppercase tracking-wider text-ink-muted">Tabs</h2>
@@ -24,7 +23,6 @@ export function TabRail({ tabs, activeIndex, historyCounts, onSelect, onRegenera
               {tab.title}
             </button>
             <IconButton label={`Undo last change to ${tab.title}`} disabled={!historyCounts[tab.id]} onClick={() => onUndo(tab)}>↶</IconButton>
-            <IconButton label={`Regenerate ${tab.title}`} onClick={() => onRegenerate(tab)}>⟳</IconButton>
           </li>
         ))}
       </ul>

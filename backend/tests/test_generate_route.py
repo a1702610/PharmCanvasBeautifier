@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.ai import gemini
-from app.ai.schema import WirePage, WireTab
+from app.ai.schema import WirePage
 from app.main import app
 
 client = TestClient(app)
@@ -69,37 +69,6 @@ def test_generate_maps_gemini_errors(calls):
     response = client.post("/api/generate", json={"text": TEXT}, headers=HEADERS)
     assert response.status_code == 429
     assert response.json()["detail"] == gemini.RATE_MESSAGE
-
-
-def test_regenerate_tab_keeps_id_and_passes_instruction(calls):
-    calls.outcome["value"] = WireTab.model_validate(
-        {"title": "Management", "blocks": [P, {"type": "clinical", "body": "Relevant to practice."}]}
-    )
-    body = {
-        "text": TEXT,
-        "images": IMAGES,
-        "outline": {"intro": ["Intro."], "tab_titles": ["Overview", "Management"]},
-        "tab": {"id": "t2", "title": "Management", "blocks": [P]},
-        "instruction": "Make it shorter",
-    }
-    response = client.post("/api/regenerate-tab", json=body, headers=HEADERS)
-    assert response.status_code == 200
-    data = response.json()
-    assert data["tab"]["id"] == "t2"
-    assert len(data["tab"]["blocks"]) == 2
-    assert data["notes"] == []
-    kwargs = calls[0]
-    assert kwargs["schema"] is WireTab
-    assert "Make it shorter" in kwargs["prompt"]
-    assert "Overview" in kwargs["prompt"]
-    assert "Regenerating one tab" in kwargs["system_prompt"]
-
-
-def test_regenerate_tab_empty_result_is_502(calls):
-    calls.outcome["value"] = WireTab.model_validate({"title": "X", "blocks": []})
-    body = {"text": TEXT, "outline": {}, "tab": {"id": "t1", "title": "X", "blocks": [P]}, "instruction": "Shorter"}
-    response = client.post("/api/regenerate-tab", json=body, headers=HEADERS)
-    assert response.status_code == 502
 
 
 def test_generate_empty_page_is_502(calls):

@@ -1,5 +1,3 @@
-import type { Tab } from "./page";
-
 export type SourceKind = "docx" | "pptx" | "pdf" | "canvas";
 
 export interface SourceStatus {
@@ -46,15 +44,6 @@ export interface GenerateRequest {
   instructions: string;
   include_revision: boolean;
   title: string;
-  course_context: string;
-}
-
-export interface RegenerateTabRequest {
-  text: string;
-  images: ImageForAI[];
-  outline: { intro: string[]; tab_titles: string[] };
-  tab: Tab;
-  instruction: string;
   course_context: string;
 }
 

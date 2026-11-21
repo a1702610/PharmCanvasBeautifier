@@ -286,12 +286,3 @@ def finalize_page(wire: WirePage, ctx: SourceContext, include_revision: bool) ->
         notes=ai_notes + f.notes,
     )
 
-
-def finalize_tab(wire: WireTab, ctx: SourceContext, tab_id: str) -> tuple[Tab, list[Note]]:
-    f = _Finalizer(ctx)
-    t = f.tab(wire, tab_id)
-    if t is None:
-        raise ValueError("The regenerated tab has no content.")
-    if not _has_clinical(t.blocks):
-        f.note(f"Tab '{t.title}' has no 'Why this matters clinically' callout.")
-    return t, f.notes

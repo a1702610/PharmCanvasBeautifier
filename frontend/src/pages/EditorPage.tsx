@@ -1,22 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useParams } from "react-router-dom";
-import { getApiErrorMessage } from "../api/client";
-import { regenerateTab } from "../api/endpoints";
 import { CanvasPreview } from "../components/editor/CanvasPreview";
 import { NotesPanel } from "../components/editor/NotesPanel";
 import { StudyMaterialsForm, emptyStudy } from "../components/study/StudyMaterialsForm";
-import { RegenerateDialog } from "../components/editor/RegenerateDialog";
 import { TabRail } from "../components/editor/TabRail";
 import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
-import { buildCourseContext, getCourse } from "../storage/courses";
 import { setAtPath } from "../render/editing";
 import { buildContext, renderPage } from "../render/renderPage";
 import { getPage, savePage, type SavedPage } from "../storage/db";
 import { exportPageJson } from "../storage/exchange";
-import { imagesForAI, replaceTab, undoTab, usedImageRefs } from "../storage/pageOps";
-import type { StudyMaterials, Tab } from "../types/page";
+import { replaceTab, undoTab, usedImageRefs } from "../storage/pageOps";
+import type { StudyMaterials } from "../types/page";
 import { buildImagesZip, downloadBlob, safeFilename } from "../utils/downloads";
 import { formatDate } from "../utils/format";
 
@@ -28,8 +24,6 @@ export default function EditorPage() {
   const [view, setView] = useState<"preview" | "html">("preview");
   const [editable, setEditable] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [regenTarget, setRegenTarget] = useState<Tab | null>(null);
-  const [regenBusy, setRegenBusy] = useState(false);
   const [tipOpen, setTipOpen] = useState(false);
   const [studyOpen, setStudyOpen] = useState(false);
   const [studyDraft, setStudyDraft] = useState<StudyMaterials>(emptyStudy());
@@ -133,30 +127,6 @@ export default function EditorPage() {
     await persist({ ...base, page: { ...base.page, study: studyDraft } });
   }
 
-  async function submitRegenerate(instruction: string) {
-    if (!regenTarget) return;
-    setRegenBusy(true);
-    try {
-      const course = current.courseId ? await getCourse(current.courseId) : undefined;
-      const result = await regenerateTab({
-        text: current.sourceText,
-        images: imagesForAI(current.images),
-        outline: { intro: current.page.intro, tab_titles: current.page.tabs.map((t) => t.title) },
-        tab: regenTarget,
-        instruction,
-        course_context: buildCourseContext(course),
-      });
-      const latest = (await getPage(current.id)) ?? current;
-      await persist(replaceTab(latest, regenTarget.id, result.tab, result.notes));
-      setRegenTarget(null);
-      toast.success("Tab regenerated");
-    } catch (err) {
-      toast.error(getApiErrorMessage(err, "Regeneration failed. Please try again."));
-    } finally {
-      setRegenBusy(false);
-    }
-  }
-
   // Synchronous (CanvasPreview needs the result right away): returns false if the edit couldn't
   // be applied, so the preview reverts the element. persist() updates state optimistically
   // before its first await, so an accepted edit is already in `saved` when this returns;
@@ -203,7 +173,6 @@ export default function EditorPage() {
             activeIndex={activeIndex}
             historyCounts={historyCounts}
             onSelect={(i) => { setActiveIndex(i); setView("preview"); }}
-            onRegenerate={setRegenTarget}
             onUndo={(tab) => persist(undoTab(savedRef.current ?? current, tab.id)).catch(() => toast.error("Couldn't undo."))}
           />
           <NotesPanel notes={current.page.notes} />
@@ -249,7 +218,6 @@ export default function EditorPage() {
         </div>
       </div>
 
-      <RegenerateDialog tab={regenTarget} busy={regenBusy} onClose={() => setRegenTarget(null)} onSubmit={submitRegenerate} />
       <Modal
         open={studyOpen}
         wide

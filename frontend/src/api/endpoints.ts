@@ -1,6 +1,6 @@
 import { api } from "./client";
-import type { ExtractResult, GenerateRequest, RegenerateTabRequest, SourceInput } from "../types/api";
-import type { Note, Page, Tab } from "../types/page";
+import type { ExtractResult, GenerateRequest, SourceInput } from "../types/api";
+import type { Page } from "../types/page";
 
 export async function checkHealth(): Promise<void> {
   await api.get("/health", { timeout: 10_000 });
@@ -25,10 +25,5 @@ export async function extractSources(sources: SourceInput[]): Promise<ExtractRes
 
 export async function generatePage(req: GenerateRequest): Promise<{ page: Page }> {
   const { data } = await api.post<{ page: Page }>("/generate", req);
-  return data;
-}
-
-export async function regenerateTab(req: RegenerateTabRequest): Promise<{ tab: Tab; notes: Note[] }> {
-  const { data } = await api.post<{ tab: Tab; notes: Note[] }>("/regenerate-tab", req);
   return data;
 }
