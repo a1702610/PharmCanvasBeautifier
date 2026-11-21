@@ -72,3 +72,62 @@
   outline: 2px solid #836bff;
   outline-offset: 2px;
 }
+
+/* Add/delete controls, rendered only in edit mode (contentLines / accordion in templates.ts). */
+.canvas-preview .pc-block {
+  position: relative;
+  border-radius: 6px;
+}
+.canvas-preview .pc-block:hover {
+  box-shadow: 0 0 0 1px #ddd8ef;
+}
+.canvas-preview .pc-del {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  z-index: 2;
+  display: none;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid #ddd8ef;
+  background: #ffffff;
+  color: #991b1b;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.canvas-preview .pc-block:hover > .pc-del { display: inline-flex; }
+.canvas-preview .pc-del:hover { background: #fef2f2; border-color: #b91c1c; }
+.canvas-preview .dp-panel-heading > .pc-del {
+  position: static;
+  display: inline-flex;
+  float: right;
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
+  font-weight: 400;
+}
+.canvas-preview .pc-add {
+  display: flex;
+  justify-content: center;
+  margin: 2px 0;
+  opacity: 0.35;
+  transition: opacity 0.15s;
+}
+.canvas-preview .pc-add:hover,
+.canvas-preview .pc-add:focus-within { opacity: 1; }
+.canvas-preview .pc-add > button {
+  padding: 2px 12px;
+  border-radius: 999px;
+  border: 1px dashed #836bff;
+  background: #ffffff;
+  color: #140f50;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.canvas-preview .pc-add > button:hover { background: #f4f2fb; }
+.canvas-preview .dp-accordion-default > .pc-add { margin: 6px 0; }

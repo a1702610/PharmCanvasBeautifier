@@ -284,3 +284,55 @@ describe("CanvasPreview: open accordions survive an external re-render", () => {
     container.remove();
   });
 });
+
+describe("CanvasPreview: add/delete controls", () => {
+  const html =
+    `<div class="dp-panels-wrapper dp-tabs-buttons-vertical"><div class="dp-panel-group"><h3 class="dp-panel-heading">1. A</h3><div class="dp-panel-content">` +
+    `<div class="pc-add"><button type="button" data-pc-action="add" data-pc-list="tabs.0.blocks" data-pc-index="0">+ Add</button></div>` +
+    `<div class="pc-block"><button type="button" class="pc-del" data-pc-action="delete" data-pc-path="tabs.0.blocks.0">x</button>` +
+    `<div class="dp-panels-wrapper dp-accordion-default"><div class="dp-panel-group"><h4 class="dp-panel-heading"><span data-edit="tabs.0.blocks.0.panels.0.title">One</span>` +
+    `<button type="button" class="pc-del" data-pc-action="delete" data-pc-path="tabs.0.blocks.0.panels.0">x</button></h4><div class="dp-panel-content"><p>x</p></div></div>` +
+    `<div class="pc-add"><button type="button" data-pc-action="add-panel" data-pc-list="tabs.0.blocks.0.panels" data-pc-index="1">+ Add collapsible panel</button></div>` +
+    `</div></div></div></div></div>`;
+
+  function mount(onAction: (a: unknown) => void, onSelect = vi.fn()) {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(<CanvasPreview html={html} activeIndex={0} editable onSelect={onSelect} onEdit={() => true} onAction={onAction} />);
+    });
+    return { container, root, onSelect };
+  }
+
+  it("reports add, add-panel and delete clicks without selecting tabs or toggling accordions", () => {
+    const onAction = vi.fn();
+    const { container, root, onSelect } = mount(onAction);
+    const click = (sel: string) => act(() => (container.querySelector(sel) as HTMLElement).click());
+
+    click('[data-pc-action="add"]');
+    expect(onAction).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "add", list: "tabs.0.blocks", index: 0 }));
+    expect(onAction.mock.calls[0][0].anchor).toBeDefined();
+
+    click('[data-pc-action="add-panel"]');
+    expect(onAction).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "add-panel", list: "tabs.0.blocks.0.panels", index: 1 }));
+
+    click('[data-pc-path="tabs.0.blocks.0.panels.0"]');
+    expect(onAction).toHaveBeenLastCalledWith({ kind: "delete", path: "tabs.0.blocks.0.panels.0" });
+    expect(container.querySelector(".dp-accordion-default > .dp-panel-group")!.classList.contains("is-open")).toBe(false);
+
+    click('[data-pc-path="tabs.0.blocks.0"]');
+    expect(onAction).toHaveBeenLastCalledWith({ kind: "delete", path: "tabs.0.blocks.0" });
+    expect(onSelect).not.toHaveBeenCalled();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("keeps the control buttons through sanitising", () => {
+    const { container, root } = mount(vi.fn());
+    expect(container.querySelectorAll("[data-pc-action]")).toHaveLength(4);
+    act(() => root.unmount());
+    container.remove();
+  });
+});

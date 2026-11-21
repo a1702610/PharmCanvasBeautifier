@@ -13,6 +13,12 @@ import { collapseNewlines, htmlToMarkdown } from "../../render/editing";
 import "../../render/preview.css";
 import { sanitizePreviewHtml } from "../../render/sanitize";
 
+/** A click on one of the editor's add/delete controls (rendered only in edit mode; see
+ *  contentLines in templates.ts). `list` is the dot path of the list to insert into. */
+export type PreviewAction =
+  | { kind: "add" | "add-panel"; list: string; index: number; anchor: DOMRect }
+  | { kind: "delete"; path: string };
+
 interface Props {
   html: string;
   activeIndex: number;
@@ -23,6 +29,7 @@ interface Props {
    *  Returns whether the edit was accepted; on false the element is reverted to its content at
    *  focus time. */
   onEdit: (path: string, value: string) => boolean;
+  onAction?: (action: PreviewAction) => void;
 }
 
 /** Character offset of the caret within `container`'s text content, or 0 if there's no
@@ -71,7 +78,7 @@ function escapeAttrSelector(value: string): string {
   return value.replace(/["\\]/g, "\\$&");
 }
 
-export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit }: Props) {
+export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit, onAction }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const safe = useMemo(() => sanitizePreviewHtml(html), [html]);
   // The markdown value (and raw HTML) of the [data-edit] element that currently holds focus,
@@ -162,6 +169,17 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit }:
   }, [safe, activeIndex]);
 
   function handleClick(e: MouseEvent<HTMLDivElement>) {
+    const control = (e.target as HTMLElement).closest<HTMLElement>("[data-pc-action]");
+    if (control && editable) {
+      e.preventDefault();
+      const kind = control.dataset.pcAction;
+      if (kind === "delete" && control.dataset.pcPath) {
+        onAction?.({ kind, path: control.dataset.pcPath });
+      } else if ((kind === "add" || kind === "add-panel") && control.dataset.pcList) {
+        onAction?.({ kind, list: control.dataset.pcList, index: Number(control.dataset.pcIndex ?? 0), anchor: control.getBoundingClientRect() });
+      }
+      return;
+    }
     const heading = (e.target as HTMLElement).closest(".dp-panel-heading");
     if (!heading || !ref.current) return;
     const group = heading.parentElement;

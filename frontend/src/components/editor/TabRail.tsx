@@ -7,9 +7,11 @@ interface Props {
   historyCounts: Record<string, number>;
   onSelect: (index: number) => void;
   onUndo: (tab: Tab) => void;
+  onAdd: () => void;
+  onDelete: (index: number) => void;
 }
 
-export function TabRail({ tabs, activeIndex, historyCounts, onSelect, onUndo }: Props) {
+export function TabRail({ tabs, activeIndex, historyCounts, onSelect, onUndo, onAdd, onDelete }: Props) {
   return (
     <nav aria-label="Page sections">
       <h2 className="px-3 text-xs font-semibold uppercase tracking-wider text-ink-muted">Tabs</h2>
@@ -23,9 +25,17 @@ export function TabRail({ tabs, activeIndex, historyCounts, onSelect, onUndo }: 
               {tab.title}
             </button>
             <IconButton label={`Undo last change to ${tab.title}`} disabled={!historyCounts[tab.id]} onClick={() => onUndo(tab)}>↶</IconButton>
+            <IconButton label={`Delete ${tab.title}`} disabled={tabs.length <= 1} onClick={() => onDelete(i)}>×</IconButton>
           </li>
         ))}
       </ul>
+      <button
+        type="button"
+        onClick={onAdd}
+        className="mt-2 w-full rounded-xl border border-dashed border-line px-3 py-2 text-left text-sm font-medium text-ink-muted hover:border-purple hover:text-navy"
+      >
+        + Add tab
+      </button>
     </nav>
   );
 }

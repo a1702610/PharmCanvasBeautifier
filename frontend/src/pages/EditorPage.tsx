@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useParams } from "react-router-dom";
-import { CanvasPreview } from "../components/editor/CanvasPreview";
+import { AddBlockMenu } from "../components/editor/AddBlockMenu";
+import { CanvasPreview, type PreviewAction } from "../components/editor/CanvasPreview";
 import { NotesPanel } from "../components/editor/NotesPanel";
 import { StudyMaterialsForm, emptyStudy } from "../components/study/StudyMaterialsForm";
 import { TabRail } from "../components/editor/TabRail";
@@ -12,7 +13,8 @@ import { buildContext, renderPage } from "../render/renderPage";
 import { getPage, savePage, type SavedPage } from "../storage/db";
 import { exportPageJson } from "../storage/exchange";
 import { replaceTab, undoTab, usedImageRefs } from "../storage/pageOps";
-import type { StudyMaterials } from "../types/page";
+import { addTab, insertBlock, newBlock, newPanel, removeItem, removeTab } from "../storage/structureOps";
+import type { Block, Page, StudyMaterials } from "../types/page";
 import { buildImagesZip, downloadBlob, safeFilename } from "../utils/downloads";
 import { formatDate } from "../utils/format";
 
@@ -27,6 +29,8 @@ export default function EditorPage() {
   const [tipOpen, setTipOpen] = useState(false);
   const [studyOpen, setStudyOpen] = useState(false);
   const [studyDraft, setStudyDraft] = useState<StudyMaterials>(emptyStudy());
+  const [addMenu, setAddMenu] = useState<{ list: string; index: number; anchor: DOMRect } | null>(null);
+  const [tabToDelete, setTabToDelete] = useState<number | null>(null);
 
   // Mirrors `saved`, but written synchronously (not via a render/effect) wherever we change
   // it, so a handler that fires right after another one just saved (e.g. Copy/Undo clicked in
@@ -127,6 +131,56 @@ export default function EditorPage() {
     await persist({ ...base, page: { ...base.page, study: studyDraft } });
   }
 
+  // Structural change inside one tab (add/delete a section or panel). Goes through replaceTab
+  // so ↶ can undo it, like a text edit.
+  function changeTab(path: string, change: (page: Page) => Page) {
+    const base = savedRef.current ?? current;
+    const tabIndex = Number(path.match(/^tabs\.(\d+)\./)?.[1] ?? -1);
+    const tab = base.page.tabs[tabIndex];
+    let nextPage: Page;
+    try {
+      if (!tab) throw new Error(`No tab for ${path}`);
+      nextPage = change(base.page);
+    } catch {
+      toast.error("Couldn't change that section.");
+      return;
+    }
+    persist(replaceTab(base, tab.id, nextPage.tabs[tabIndex])).catch(() => toast.error("Couldn't save that change."));
+  }
+
+  function handleAction(action: PreviewAction) {
+    if (action.kind === "delete") changeTab(action.path, (page) => removeItem(page, action.path));
+    else if (action.kind === "add") setAddMenu({ list: action.list, index: action.index, anchor: action.anchor });
+    else changeTab(action.list, (page) => insertBlock(page, action.list, action.index, newPanel()));
+  }
+
+  function addSection(type: Block["type"]) {
+    const target = addMenu;
+    setAddMenu(null);
+    if (target) changeTab(target.list, (page) => insertBlock(page, target.list, target.index, newBlock(type)));
+  }
+
+  function handleAddTab() {
+    const base = savedRef.current ?? current;
+    persist({ ...base, page: addTab(base.page) }).catch(() => toast.error("Couldn't add the tab."));
+    setActiveIndex(base.page.tabs.length);
+    setView("preview");
+    setEditable(true);
+  }
+
+  function confirmDeleteTab() {
+    const index = tabToDelete;
+    setTabToDelete(null);
+    if (index === null) return;
+    const base = savedRef.current ?? current;
+    const tab = base.page.tabs[index];
+    if (!tab) return;
+    const history = { ...base.history };
+    delete history[tab.id];
+    persist({ ...base, history, page: removeTab(base.page, index) }).catch(() => toast.error("Couldn't delete the tab."));
+    setActiveIndex((active) => Math.max(0, active > index ? active - 1 : Math.min(active, base.page.tabs.length - 2)));
+  }
+
   // Synchronous (CanvasPreview needs the result right away): returns false if the edit couldn't
   // be applied, so the preview reverts the element. persist() updates state optimistically
   // before its first await, so an accepted edit is already in `saved` when this returns;
@@ -174,6 +228,8 @@ export default function EditorPage() {
             historyCounts={historyCounts}
             onSelect={(i) => { setActiveIndex(i); setView("preview"); }}
             onUndo={(tab) => persist(undoTab(savedRef.current ?? current, tab.id)).catch(() => toast.error("Couldn't undo."))}
+            onAdd={handleAddTab}
+            onDelete={setTabToDelete}
           />
           <NotesPanel notes={current.page.notes} />
         </div>
@@ -202,10 +258,20 @@ export default function EditorPage() {
             >
               Edit text
             </button>
+            {editable && (
+              <span className="text-xs text-ink-muted">Click any text to change it. Use + Add and × to add or remove sections.</span>
+            )}
           </div>
           <div className="mt-4 rounded-2xl border border-line bg-white p-6 shadow-sm">
             {view === "preview" ? (
-              <CanvasPreview html={previewHtml} activeIndex={activeIndex} editable={editable} onSelect={setActiveIndex} onEdit={handleEdit} />
+              <CanvasPreview
+                html={previewHtml}
+                activeIndex={activeIndex}
+                editable={editable}
+                onSelect={setActiveIndex}
+                onEdit={handleEdit}
+                onAction={handleAction}
+              />
             ) : (
               <pre className="max-h-[70vh] overflow-auto rounded-xl bg-limestone-soft p-5 font-mono text-xs leading-relaxed text-navy">
                 <code>{html}</code>
@@ -233,6 +299,29 @@ export default function EditorPage() {
         <div className="max-h-[60vh] overflow-y-auto pr-1">
           <StudyMaterialsForm value={studyDraft} onChange={setStudyDraft} />
         </div>
+      </Modal>
+      {addMenu && (
+        <AddBlockMenu
+          anchor={addMenu.anchor}
+          insidePanel={/\.panels\.\d+\.blocks$/.test(addMenu.list)}
+          onPick={addSection}
+          onClose={() => setAddMenu(null)}
+        />
+      )}
+      <Modal
+        open={tabToDelete !== null}
+        title="Delete this tab?"
+        onClose={() => setTabToDelete(null)}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setTabToDelete(null)}>Cancel</Button>
+            <Button variant="primary" onClick={confirmDeleteTab}>Delete tab</Button>
+          </>
+        }
+      >
+        <p className="font-serif text-sm leading-relaxed">
+          “{tabToDelete !== null ? current.page.tabs[tabToDelete]?.title : ""}” and everything in it will be removed. This can't be undone.
+        </p>
       </Modal>
       <Modal open={tipOpen} title="HTML copied" onClose={() => setTipOpen(false)} footer={<Button variant="primary" onClick={() => setTipOpen(false)}>Got it</Button>}>
         <ol className="list-decimal space-y-1 pl-5 font-serif text-sm leading-relaxed">
