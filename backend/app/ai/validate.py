@@ -329,6 +329,15 @@ def finalize_page(wire: WirePage, ctx: SourceContext, include_revision: bool) ->
     )
 
 
+def unit_label(ctx: SourceContext, key: tuple[int, int]) -> str:
+    """How a slide/page is named in notes: "Page 2 (Title)", with the file name when there
+    are several sources."""
+    name, kind, title = ctx.units[key]
+    one_source = len({source for source, _ in ctx.units}) == 1
+    where = f"{kind} {key[1]}" if one_source else f"{name} {kind.lower()} {key[1]}"
+    return where + (f" ({title})" if title else "")
+
+
 def _coverage_notes(coverage: list[WireCoverage], ctx: SourceContext) -> list[Note]:
     """Lists the slides/pages the AI didn't account for (so gaps aren't silent), and the ones
     it deliberately left out, with its reasons."""
@@ -343,12 +352,8 @@ def _coverage_notes(coverage: list[WireCoverage], ctx: SourceContext) -> list[No
         elif item.status == "omitted" and (item.reason or "").strip():
             omitted[key] = item.reason.strip()
 
-    one_source = len({source for source, _ in ctx.units}) == 1
-
     def label(key: tuple[int, int]) -> str:
-        name, kind, title = ctx.units[key]
-        where = f"{kind} {key[1]}" if one_source else f"{name} {kind.lower()} {key[1]}"
-        return where + (f" ({title})" if title else "")
+        return unit_label(ctx, key)
 
     notes: list[Note] = []
     missing = [k for k in sorted(ctx.units) if k not in used and k not in omitted]

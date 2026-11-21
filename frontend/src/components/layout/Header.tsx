@@ -14,9 +14,8 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3">
-        <Link to="/" className="flex items-baseline gap-3">
+        <Link to="/" className="flex items-baseline">
           <span className="font-display text-2xl font-bold tracking-tight text-navy">PharmCanvas</span>
-          <span className="hidden text-sm text-ink-muted md:inline">Canvas pages for pharmacy, in one house style</span>
         </Link>
         <nav className="ml-auto flex items-center gap-1">
           <NavLink to="/" className={() => navClass({ isActive: pathname === "/" || pathname.startsWith("/create") })}>Create</NavLink>

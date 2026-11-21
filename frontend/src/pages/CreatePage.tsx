@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { getApiErrorMessage } from "../api/client";
-import { extractSources, generatePage } from "../api/endpoints";
+import { auditPage, extractSources, generatePage } from "../api/endpoints";
 import { Dropzone } from "../components/create/Dropzone";
 import { GenerateProgress, type Stage } from "../components/create/GenerateProgress";
 import { loadModelChoice, ModelChoice, saveModelChoice, type ModelChoiceValue } from "../components/create/ModelChoice";
@@ -17,7 +17,7 @@ import { buildCourseContext, listCourses, type Course } from "../storage/courses
 import { newSavedPage, savePage } from "../storage/db";
 import { imagesForAI, sourceNotes } from "../storage/pageOps";
 import type { ExtractResult, SourceInput, SourceStatus } from "../types/api";
-import type { StudyMaterials } from "../types/page";
+import type { Note, StudyMaterials } from "../types/page";
 
 export default function CreatePage() {
   const navigate = useNavigate();
@@ -120,9 +120,18 @@ export default function CreatePage() {
         course_context: buildCourseContext(course),
         model,
       });
+      // The automatic check compares the page with the slides; if it can't run, the page is
+      // still saved and the lecturer is told.
+      setStage("checking");
+      let checkNotes: Note[];
+      try {
+        ({ notes: checkNotes } = await auditPage({ text: result.text, images: imagesForAI(result.images), pages: result.pages ?? [], page, model }));
+      } catch {
+        checkNotes = [{ kind: "flag", text: "The automatic check against your slides couldn't run this time. Check the page against your material yourself." }];
+      }
       setStage("building");
-      const notes = sourceNotes(result.sources);
-      const withNotes = notes.length ? { ...page, notes: [...page.notes, ...notes] } : page;
+      const notes = [...checkNotes, ...page.notes, ...sourceNotes(result.sources)];
+      const withNotes = { ...page, notes };
       const pageWithNotes = { ...withNotes, study };
       const saved = await savePage({
         ...newSavedPage({ page: pageWithNotes, sourceText: result.text, images: result.images, embeds: result.embeds }),

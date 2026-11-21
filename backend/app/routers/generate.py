@@ -8,7 +8,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.ai import gemini
 from app.ai.prompts import build_generate_prompt, load_prompt
-from app.ai.schema import Page, WirePage
+from app.ai.audit import audit_notes, page_to_text
+from app.ai.schema import Note, Page, WireAudit, WirePage
 from app.ai.validate import SourceContext, finalize_page
 from app.config import settings
 
@@ -43,6 +44,18 @@ class GenerateRequest(BaseModel):
     @classmethod
     def _cap_course_context(cls, v: str) -> str:
         return v.strip()[:12000]
+
+
+class AuditRequest(BaseModel):
+    text: str = Field(min_length=1)
+    images: list[ImageForAI] = Field(default_factory=list)
+    pages: list[PageForAI] = Field(default_factory=list, max_length=settings.MAX_PAGES_TO_AI)
+    page: Page
+    model: Literal["flash", "pro"] = "flash"
+
+
+class AuditResponse(BaseModel):
+    notes: list[Note]
 
 
 class GenerateResponse(BaseModel):
@@ -113,3 +126,28 @@ async def generate(req: GenerateRequest, x_gemini_key: str | None = Header(defau
         page.title = req.title.strip()
     return GenerateResponse(page=page)
 
+
+
+def _model_id(choice: str) -> str:
+    return settings.GEMINI_PRO_MODEL if choice == "pro" else settings.GEMINI_MODEL
+
+
+@router.post("/audit", response_model=AuditResponse)
+async def audit(req: AuditRequest, x_gemini_key: str | None = Header(default=None)):
+    """The automatic check: compares a generated page with its source and returns notes."""
+    key = _require_key(x_gemini_key)
+    prompt = "PAGE:\n<<<\n" + page_to_text(req.page) + "\n>>>\n\nSOURCE (extracted text):\n<<<\n" + req.text + "\n>>>"
+    try:
+        result = await gemini.generate_structured(
+            api_key=key,
+            system_prompt=load_prompt("audit"),
+            prompt=prompt,
+            images=_page_parts(req.pages) + _image_parts(req.images),
+            schema=WireAudit,
+            model=_model_id(req.model),
+        )
+    except gemini.GeminiError as exc:
+        if req.model == "pro" and exc.status_code == 429:
+            raise HTTPException(429, PRO_KEY_MESSAGE)
+        raise HTTPException(exc.status_code, exc.message)
+    return AuditResponse(notes=audit_notes(result.issues, SourceContext.from_text(req.text)))

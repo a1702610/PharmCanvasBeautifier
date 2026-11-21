@@ -127,6 +127,19 @@ class WireCoverage(BaseModel):
     reason: str | None = None
 
 
+class WireAuditIssue(BaseModel):
+    """One finding of the automatic check that compares the page with the source."""
+
+    kind: Literal["missing", "changed", "added"] | None = None
+    source: int | None = None
+    unit: int | None = None
+    detail: str | None = None
+
+
+class WireAudit(BaseModel):
+    issues: list[WireAuditIssue] = Field(default_factory=list)
+
+
 class WirePage(BaseModel):
     title: str
     intro: list[str]

@@ -1,3 +1,5 @@
+import type { Page } from "./page";
+
 export type SourceKind = "docx" | "pptx" | "pdf" | "canvas";
 
 export interface SourceStatus {
@@ -57,6 +59,15 @@ export interface GenerateRequest {
   title: string;
   course_context: string;
   /** "flash" (default, free key) or "pro" (needs billing). */
+  model: "flash" | "pro";
+}
+
+/** The automatic check: compares a generated page with its source. */
+export interface AuditRequest {
+  text: string;
+  images: ImageForAI[];
+  pages: PageImage[];
+  page: Page;
   model: "flash" | "pro";
 }
 

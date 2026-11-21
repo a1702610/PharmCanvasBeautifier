@@ -40,6 +40,7 @@ describe("HomePage", () => {
     expect(c.textContent).toContain("Use AI");
     expect(c.textContent).toContain("Build it manually");
     expect(c.textContent).toMatch(/hit or miss/i);
+    expect(c.textContent).toMatch(/split long lectures into parts/i);
   });
 
   it("Use AI goes to the upload page", () => {

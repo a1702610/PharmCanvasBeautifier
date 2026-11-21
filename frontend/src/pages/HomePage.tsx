@@ -5,7 +5,7 @@ import { newSavedPage, savePage } from "../storage/db";
 import { blankPage } from "../storage/structureOps";
 
 const CARD =
-  "flex aspect-square flex-col rounded-3xl border p-8 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-purple sm:p-10";
+  "flex min-h-[420px] flex-col rounded-3xl border p-8 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-purple sm:p-10";
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -33,19 +33,20 @@ export default function HomePage() {
         <Link to="/create" className={`${CARD} border-line bg-limestone-soft`}>
           <span aria-hidden="true" className="text-4xl">✦</span>
           <span className="mt-6 font-display text-3xl font-bold text-navy">Use AI</span>
-          <span className="mt-3 font-serif text-ink-muted">
+          <span className="mt-3 mb-6 font-serif text-ink-muted">
             Upload your Word, PowerPoint or PDF files (or an old Canvas page) and Gemini restructures them into the template.
           </span>
           <span className="mt-auto rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
             AI can be hit or miss with transferring all your content: it may leave out, merge or reword parts. Always check the
             page against your original material.
+            <strong className="mt-2 block">Tip: split long lectures into parts (about 15–20 slides each) and make one page per part. The AI is much more complete with less to fit in.</strong>
           </span>
         </Link>
 
         <button type="button" onClick={buildManually} disabled={busy} className={`${CARD} border-line bg-purple-soft disabled:opacity-60`}>
           <span aria-hidden="true" className="text-4xl">✎</span>
           <span className="mt-6 font-display text-3xl font-bold text-navy">Build it manually</span>
-          <span className="mt-3 font-serif text-ink-muted">
+          <span className="mt-3 mb-6 font-serif text-ink-muted">
             Start from a blank page in the same template and add your own sections: paragraphs, tables, callouts, check your
             understanding and more.
           </span>
