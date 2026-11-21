@@ -118,6 +118,15 @@ class WireFigureRef(BaseModel):
     caption: str | None = None
 
 
+class WireCoverage(BaseModel):
+    """Where one source slide/page went: `used` on the page, or `omitted` with a reason."""
+
+    source: int | None = None
+    unit: int | None = None
+    status: Literal["used", "omitted"] | None = None
+    reason: str | None = None
+
+
 class WirePage(BaseModel):
     title: str
     intro: list[str]
@@ -126,6 +135,7 @@ class WirePage(BaseModel):
     revision: WireRevision = Field(default_factory=WireRevision)
     study_activities: list[WireActivity] | None = None
     notes: list[Note] = Field(default_factory=list)
+    coverage: list[WireCoverage] | None = None
 
 
 # ── Typed page (API output) ──────────────────────────────────────────────────

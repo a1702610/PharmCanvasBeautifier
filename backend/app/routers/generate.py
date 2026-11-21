@@ -19,9 +19,17 @@ class ImageForAI(BaseModel):
     thumb_b64: str
 
 
+class PageForAI(BaseModel):
+    source_index: int
+    source: str = ""
+    location: str = ""
+    data_b64: str
+
+
 class GenerateRequest(BaseModel):
     text: str = Field(min_length=1)
     images: list[ImageForAI] = Field(default_factory=list)
+    pages: list[PageForAI] = Field(default_factory=list, max_length=settings.MAX_PAGES_TO_AI)
     instructions: str = ""
     include_revision: bool = False
     title: str = ""
@@ -44,6 +52,21 @@ def _require_key(key: str | None) -> str:
     return key.strip()
 
 
+def _decode(data_b64: str, what: str) -> bytes:
+    try:
+        return base64.b64decode(data_b64, validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(400, f"{what} is not valid base64.")
+
+
+def _page_parts(pages: list[PageForAI]) -> list[gemini.ImagePart]:
+    """Whole pages/slides, labelled so the AI can match them to the --- Page n --- markers."""
+    return [
+        gemini.ImagePart(label=f"Full image of SOURCE {p.source_index} ({p.source}), {p.location}:", data=_decode(p.data_b64, f"Page image {p.location}"))
+        for p in pages
+    ]
+
+
 def _image_parts(images: list[ImageForAI]) -> list[gemini.ImagePart]:
     parts = []
     for image in images[: settings.MAX_IMAGES_TO_AI]:
@@ -64,7 +87,7 @@ async def generate(req: GenerateRequest, x_gemini_key: str | None = Header(defau
             api_key=key,
             system_prompt=load_prompt("system"),
             prompt=build_generate_prompt(req.title, req.include_revision, req.instructions, req.text, course_context=req.course_context),
-            images=_image_parts(req.images),
+            images=_page_parts(req.pages) + _image_parts(req.images),
             schema=WirePage,
         )
     except gemini.GeminiError as exc:

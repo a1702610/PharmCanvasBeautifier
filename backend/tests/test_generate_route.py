@@ -86,3 +86,21 @@ def test_generate_passes_course_context_truncated(calls):
     prompt = calls[-1]["prompt"]
     assert "COURSE CONTEXT" in prompt
     assert "x" * 12000 in prompt and "x" * 12001 not in prompt
+
+
+def test_generate_sends_page_images_before_image_thumbnails(calls):
+    calls.outcome["value"] = wire_page()
+    page_b64 = base64.b64encode(b"page-jpeg").decode()
+    body = {"text": TEXT, "images": IMAGES, "pages": [{"source_index": 1, "source": "a.pptx", "location": "slide 1", "data_b64": page_b64}]}
+    response = client.post("/api/generate", json=body, headers=HEADERS)
+    assert response.status_code == 200
+    parts = calls[0]["images"]
+    assert parts[0].label == "Full image of SOURCE 1 (a.pptx), slide 1:"
+    assert parts[0].data == b"page-jpeg"
+    assert parts[1].label == "Image IMG-01 (slide 1):"
+
+
+def test_generate_limits_page_images(calls):
+    page = {"source_index": 1, "source": "a.pdf", "location": "page 1", "data_b64": base64.b64encode(b"x").decode()}
+    response = client.post("/api/generate", json={"text": TEXT, "pages": [page] * 201}, headers=HEADERS)
+    assert response.status_code == 422

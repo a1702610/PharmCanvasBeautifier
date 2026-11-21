@@ -111,6 +111,7 @@ export default function CreatePage() {
       const { page } = await generatePage({
         text: result.text,
         images: imagesForAI(result.images),
+        pages: result.pages ?? [],
         instructions,
         include_revision: includeRevision,
         title,

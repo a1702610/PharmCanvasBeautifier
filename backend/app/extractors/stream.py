@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from app.extractors.common import PLACEHOLDER_RE, SourceExtract
 from app.extractors.images import ImageRejected, image_hash, make_thumbnail, prepare_image
-from app.extractors.models import EmbedInfo, ImageInfo
+from app.extractors.models import EmbedInfo, ImageInfo, PageImage
 
 MAX_REPEATS = 2
 
@@ -17,13 +17,14 @@ class Assembled:
     images: list[ImageInfo]
     embeds: list[EmbedInfo]
     warnings: list[list[str]]
+    pages: list[PageImage]
 
 
 def _marker(info: ImageInfo) -> str:
     return f"[{info.ref}: {info.location}]" if info.location else f"[{info.ref}]"
 
 
-def assemble(sources: list[tuple[str, SourceExtract]], max_ai_images: int) -> Assembled:
+def assemble(sources: list[tuple[str, SourceExtract]], max_ai_images: int, max_pages: int = 80) -> Assembled:
     counts = Counter(
         image_hash(img.data) for _, ex in sources for img in ex.images if img.data is not None
     )
@@ -33,6 +34,7 @@ def assemble(sources: list[tuple[str, SourceExtract]], max_ai_images: int) -> As
     by_hash: dict[str, ImageInfo | None] = {}
     parts: list[str] = []
     warnings: list[list[str]] = []
+    pages: list[PageImage] = []
 
     for k, (name, ex) in enumerate(sources, start=1):
         unreadable = 0
@@ -78,8 +80,16 @@ def assemble(sources: list[tuple[str, SourceExtract]], max_ai_images: int) -> As
             [f"{unreadable} image(s) couldn't be read (unsupported format) and were skipped."]
             if unreadable else []
         )
+        for location, data in ex.page_renders:
+            if len(pages) >= max_pages:
+                warnings[-1].append(
+                    f"Only the first {max_pages} pages are sent to the AI as images; the rest are read as text only."
+                )
+                break
+            pages.append(PageImage(source_index=k, source=name, location=location,
+                                   data_b64=base64.b64encode(data).decode("ascii")))
 
     for info in [i for i in images if i.ref in raw_bytes][:max_ai_images]:
         info.thumb_b64 = make_thumbnail(raw_bytes[info.ref])
 
-    return Assembled(text="\n\n".join(parts), images=images, embeds=embeds, warnings=warnings)
+    return Assembled(text="\n\n".join(parts), images=images, embeds=embeds, warnings=warnings, pages=pages)

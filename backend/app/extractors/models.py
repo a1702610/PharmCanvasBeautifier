@@ -23,6 +23,15 @@ class ImageInfo(BaseModel):
     canvas_tag: str | None = None
 
 
+class PageImage(BaseModel):
+    """A whole PDF page as a JPEG, sent to the AI only (not stored with the page)."""
+
+    source_index: int
+    source: str
+    location: str
+    data_b64: str
+
+
 class EmbedInfo(BaseModel):
     ref: str
     html: str
@@ -33,5 +42,6 @@ class ExtractResult(BaseModel):
     text: str
     images: list[ImageInfo]
     embeds: list[EmbedInfo]
+    pages: list[PageImage] = Field(default_factory=list)
     approx_tokens: int
     token_limit: int

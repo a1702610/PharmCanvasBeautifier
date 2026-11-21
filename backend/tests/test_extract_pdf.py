@@ -11,3 +11,17 @@ def test_pdf_pages_text_links_images_and_scan_warning():
     assert [img.location for img in ex.images] == ["page 1", "page 2"]
     assert all(img.data for img in ex.images)
     assert ex.warnings == ["Page 2 looks scanned; its text wasn't read."]
+
+
+def test_pdf_pages_are_rendered_as_jpeg_images_for_the_ai():
+    import io
+
+    from PIL import Image
+
+    ex = extract_pdf(make_pdf(noise_png(), noise_png(300, 300)), "handout.pdf")
+    assert [location for location, _ in ex.page_renders] == ["page 1", "page 2"]
+    for _, data in ex.page_renders:
+        assert data[:2] == b"\xff\xd8"  # JPEG
+        with Image.open(io.BytesIO(data)) as im:
+            assert max(im.size) <= 1000
+            assert max(im.size) >= 900

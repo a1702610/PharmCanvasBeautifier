@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
-from tests.helpers import make_docx, noise_png
+from tests.helpers import make_docx, make_pdf, noise_png
 
 client = TestClient(app)
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -47,3 +47,19 @@ def test_extract_rejects_too_many_sources():
 def test_extract_rejects_bad_order():
     response = client.post("/api/extract", data={"canvas_html": ["<p>x</p>"], "order": ["file:0"]})
     assert response.status_code == 400
+
+
+def test_extract_returns_page_images_for_pdfs():
+    files = [("files", ("deck.pdf", make_pdf(noise_png(), noise_png(300, 300)), "application/pdf"))]
+    body = client.post("/api/extract", files=files).json()
+    assert [(p["source_index"], p["source"], p["location"]) for p in body["pages"]] == [(1, "deck.pdf", "page 1"), (1, "deck.pdf", "page 2")]
+    assert all(p["data_b64"] for p in body["pages"])
+
+
+def test_powerpoint_sources_get_a_save_as_pdf_tip():
+    from tests.helpers import make_pptx
+
+    PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    body = client.post("/api/extract", files=[("files", ("deck.pptx", make_pptx(noise_png()), PPTX))]).json()
+    assert any("save it as a PDF" in w for w in body["sources"][0]["warnings"])
+    assert body["pages"] == []

@@ -27,6 +27,8 @@ class SourceExtract:
     images: list[RawImage] = field(default_factory=list)
     embeds: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    # (location, JPEG bytes) of each whole page/slide, so the AI can read what's only in pictures.
+    page_renders: list[tuple[str, bytes]] = field(default_factory=list)
 
     def add_image(self, image: RawImage) -> str:
         self.images.append(image)

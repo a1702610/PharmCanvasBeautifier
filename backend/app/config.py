@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     MAX_SOURCES: int = 5
     MAX_FILE_MB: int = 25
     MAX_IMAGES_TO_AI: int = 20
+    # Full page images (PDF pages) sent to the AI so it can read tables/charts inside slides.
+    MAX_PAGES_TO_AI: int = 80
     TOKEN_WARN_LIMIT: int = 150_000
 
     model_config = {"env_file": ".env", "extra": "ignore"}

@@ -29,3 +29,10 @@ def test_system_prompt_describes_new_blocks_and_rules():
     assert "takeaways" not in s
     assert "At least one per tab" in s
     assert "copyright" in s.lower()
+
+
+def test_system_prompt_explains_page_images_and_coverage():
+    s = load_prompt("system")
+    assert "Full image of SOURCE" in s
+    assert "coverage" in s
+    assert "omitted" in s

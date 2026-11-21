@@ -4,7 +4,7 @@ Drops empty blocks, removes links whose URL isn't in the source material,
 removes figures/embeds with unknown refs, and records each change as a note.
 """
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.ai.schema import (
     Accordion, Flow, FlowStep, Formula, KeyPoint, Panel, StudyActivity,
@@ -12,7 +12,7 @@ from app.ai.schema import (
     Block, Caution, Citation, Clinical, Counselling, ContrastTable, Critical,
     Evidence, EvidenceChild, Figure, Heading, Link, ListBlock, Note, Page,
     Paragraph, Question, References, Revision, SelfCheck, Tab, Table,
-    Takeaways, Tip, WireBlock, WireChild, WirePage, WireTab,
+    Takeaways, Tip, WireBlock, WireChild, WireCoverage, WirePage, WireTab,
 )
 
 # A URL segment made of "plain" characters or a single balanced (...) group, so a
@@ -24,6 +24,28 @@ MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((" + _URL_BODY + r")\)")
 IMG_REF_RE = re.compile(r"\[(IMG-\d+)")
 EMBED_REF_RE = re.compile(r"\[(EMBED-\d+)\]")
 TAB_NUMBER_RE = re.compile(r"^\s*\d+\s*[.)]\s+")
+SOURCE_HEADER_RE = re.compile(r"^=== SOURCE (\d+): (.*) ===$", re.M)
+UNIT_MARKER_RE = re.compile(r"^--- (Slide|Page) (\d+) ---$", re.M)
+TITLE_MAX = 60
+
+
+def _source_units(text: str) -> dict[tuple[int, int], tuple[str, str, str]]:
+    """Every "--- Slide n ---" / "--- Page n ---" in the source, keyed by (source, number),
+    with the source's file name, "Slide"/"Page" and the unit's first line of text as a title."""
+    units: dict[tuple[int, int], tuple[str, str, str]] = {}
+    headers = list(SOURCE_HEADER_RE.finditer(text))
+    for i, header in enumerate(headers):
+        end = headers[i + 1].start() if i + 1 < len(headers) else len(text)
+        section = text[header.end():end]
+        markers = list(UNIT_MARKER_RE.finditer(section))
+        for j, marker in enumerate(markers):
+            body_end = markers[j + 1].start() if j + 1 < len(markers) else len(section)
+            lines = [line.strip() for line in section[marker.end():body_end].splitlines()]
+            title = next((line for line in lines if line and not line.startswith(("[IMG-", "[EMBED-", "Links:", "|"))), "")
+            if len(title) > TITLE_MAX:
+                title = title[: TITLE_MAX - 1].rstrip() + "…"
+            units[(int(header.group(1)), int(marker.group(2)))] = (header.group(2), marker.group(1), title)
+    return units
 
 
 def _norm_url(url: str) -> str:
@@ -35,6 +57,7 @@ class SourceContext:
     urls: set[str]
     image_refs: set[str]
     embed_refs: set[str]
+    units: dict[tuple[int, int], tuple[str, str, str]] = field(default_factory=dict)
 
     @classmethod
     def from_text(cls, text: str) -> "SourceContext":
@@ -42,6 +65,7 @@ class SourceContext:
             urls={_norm_url(u) for u in URL_RE.findall(text)},
             image_refs=set(IMG_REF_RE.findall(text)),
             embed_refs=set(EMBED_REF_RE.findall(text)),
+            units=_source_units(text),
         )
 
 
@@ -273,6 +297,7 @@ def finalize_page(wire: WirePage, ctx: SourceContext, include_revision: bool) ->
         points=points or None,
     )
     ai_notes = [Note(kind=n.kind, text=n.text.strip()) for n in wire.notes if n.text.strip()]
+    coverage_notes = _coverage_notes(wire.coverage or [], ctx)
     return Page(
         title=wire.title.strip() or "Untitled page",
         intro=intro,
@@ -280,6 +305,41 @@ def finalize_page(wire: WirePage, ctx: SourceContext, include_revision: bool) ->
         study_activities=activities or None,
         tabs=tabs,
         revision=revision,
-        notes=ai_notes + f.notes,
+        notes=coverage_notes + ai_notes + f.notes,
     )
+
+
+def _coverage_notes(coverage: list[WireCoverage], ctx: SourceContext) -> list[Note]:
+    """Lists the slides/pages the AI didn't account for (so gaps aren't silent), and the ones
+    it deliberately left out, with its reasons."""
+    used: set[tuple[int, int]] = set()
+    omitted: dict[tuple[int, int], str] = {}
+    for item in coverage:
+        key = (item.source, item.unit)
+        if key not in ctx.units:
+            continue
+        if item.status == "used":
+            used.add(key)
+        elif item.status == "omitted" and (item.reason or "").strip():
+            omitted[key] = item.reason.strip()
+
+    def label(key: tuple[int, int]) -> str:
+        name, kind, title = ctx.units[key]
+        return f"{name} {kind.lower()} {key[1]}" + (f" ({title})" if title else "")
+
+    notes: list[Note] = []
+    missing = [k for k in sorted(ctx.units) if k not in used and k not in omitted]
+    if missing:
+        notes.append(Note(
+            kind="unplaced",
+            text="Slides/pages not accounted for by the AI. Check their content made it onto the page: "
+            + "; ".join(label(k) for k in missing),
+        ))
+    left_out = [(k, r) for k, r in sorted(omitted.items()) if k not in used]
+    if left_out:
+        notes.append(Note(
+            kind="unplaced",
+            text="Slides/pages the AI left out: " + "; ".join(f"{label(k)}: {r}" for k, r in left_out),
+        ))
+    return notes
 

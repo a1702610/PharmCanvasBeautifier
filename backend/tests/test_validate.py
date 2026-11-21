@@ -17,6 +17,8 @@ def tab(title, *blocks):
 
 
 def wire(tabs, **extra):
+    # The sample sources have one slide; mark it used so coverage notes only appear where tested.
+    extra.setdefault("coverage", [{"source": 1, "unit": 1, "status": "used"}])
     return WirePage.model_validate({"title": "Chronic pain", "intro": ["Intro."], "tabs": tabs, **extra})
 
 
@@ -318,3 +320,71 @@ def test_unknown_intro_figure_dropped_silently():
     page = finalize_page(w, CTX, include_revision=False)
     assert page.intro_figure is None
     assert not any("IMG-77" in n.text for n in page.notes)
+
+
+# --- Slide / page coverage -------------------------------------------------------
+from app.ai.schema import WireCoverage  # noqa: E402
+
+DECK = (
+    "=== SOURCE 1: deck.pdf ===\n\n--- Page 1 ---\nHYPERTENSION\nPart 1\n\n"
+    "--- Page 2 ---\nCardiovascular Risk Factors\n\n--- Page 3 ---\n[IMG-01: page 3]\nTypes of Hypertension\n\n"
+    "=== SOURCE 2: notes.docx ===\n\nNo page markers here.\n\n"
+    "=== SOURCE 3: more.pptx ===\n\n--- Slide 1 ---\nCombination therapy"
+)
+DECK_CTX = SourceContext.from_text(DECK)
+
+
+def test_source_units_are_parsed_with_titles():
+    assert DECK_CTX.units == {
+        (1, 1): ("deck.pdf", "Page", "HYPERTENSION"),
+        (1, 2): ("deck.pdf", "Page", "Cardiovascular Risk Factors"),
+        (1, 3): ("deck.pdf", "Page", "Types of Hypertension"),
+        (3, 1): ("more.pptx", "Slide", "Combination therapy"),
+    }
+
+
+def deck_page(coverage):
+    w = wire([tab("A", P, CLINICAL), tab("B", P, CLINICAL), tab("C", P, CLINICAL)])
+    w.coverage = coverage
+    return finalize_page(w, DECK_CTX, include_revision=False)
+
+
+def test_pages_not_accounted_for_are_listed_in_one_note():
+    page = deck_page([
+        WireCoverage(source=1, unit=1, status="omitted", reason="title slide"),
+        WireCoverage(source=1, unit=3, status="used"),
+    ])
+    missing = [n for n in page.notes if "not accounted for" in n.text]
+    assert len(missing) == 1 and missing[0].kind == "unplaced"
+    assert "deck.pdf page 2 (Cardiovascular Risk Factors)" in missing[0].text
+    assert "more.pptx slide 1 (Combination therapy)" in missing[0].text
+    assert "page 3" not in missing[0].text
+
+
+def test_pages_left_out_on_purpose_are_listed_with_reasons():
+    page = deck_page([
+        WireCoverage(source=1, unit=1, status="omitted", reason="title slide"),
+        WireCoverage(source=1, unit=2, status="used"),
+        WireCoverage(source=1, unit=3, status="used"),
+        WireCoverage(source=3, unit=1, status="used"),
+    ])
+    left_out = [n for n in page.notes if "left out" in n.text]
+    assert len(left_out) == 1
+    assert "deck.pdf page 1 (HYPERTENSION): title slide" in left_out[0].text
+    assert not any("not accounted for" in n.text for n in page.notes)
+
+
+def test_omitted_without_a_reason_counts_as_not_accounted_for():
+    page = deck_page([WireCoverage(source=1, unit=1, status="omitted", reason=" ")])
+    assert any("not accounted for" in n.text and "page 1 (HYPERTENSION)" in n.text for n in page.notes)
+
+
+def test_unknown_units_in_coverage_are_ignored_and_sources_without_pages_need_none():
+    page = deck_page([
+        WireCoverage(source=9, unit=9, status="used"),
+        WireCoverage(source=1, unit=1, status="used"),
+        WireCoverage(source=1, unit=2, status="used"),
+        WireCoverage(source=1, unit=3, status="used"),
+        WireCoverage(source=3, unit=1, status="used"),
+    ])
+    assert not any("accounted for" in n.text or "left out" in n.text for n in page.notes)

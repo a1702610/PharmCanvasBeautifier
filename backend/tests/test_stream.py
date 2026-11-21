@@ -62,3 +62,21 @@ def test_only_first_n_images_get_thumbnails_and_numbering_spans_sources():
     assert [i.ref for i in out.images] == ["IMG-01", "IMG-02"]
     assert out.images[0].thumb_b64 and out.images[1].thumb_b64 is None
     assert "=== SOURCE 2: b.docx ===\n\nIntro\n\n[IMG-02]" in out.text
+
+
+def test_page_renders_become_page_images_for_the_ai():
+    ex = extract_with("deck.pdf", {"data": noise_png(), "location": "page 1"})
+    ex.page_renders = [("page 1", b"\xff\xd8one"), ("page 2", b"\xff\xd8two")]
+    other = extract_with("notes.docx", {"data": noise_png(64, 64)})
+    out = assemble([("notes.docx", other), ("deck.pdf", ex)], max_ai_images=20)
+    assert [(p.source_index, p.source, p.location) for p in out.pages] == [(2, "deck.pdf", "page 1"), (2, "deck.pdf", "page 2")]
+    import base64
+    assert base64.b64decode(out.pages[1].data_b64) == b"\xff\xd8two"
+
+
+def test_page_images_are_capped_with_a_warning():
+    ex = extract_with("deck.pdf")
+    ex.page_renders = [(f"page {i}", b"\xff\xd8") for i in range(1, 6)]
+    out = assemble([("deck.pdf", ex)], max_ai_images=20, max_pages=3)
+    assert [p.location for p in out.pages] == ["page 1", "page 2", "page 3"]
+    assert any("Only the first 3 pages" in w for w in out.warnings[0])

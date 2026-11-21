@@ -6,6 +6,15 @@ import pymupdf
 from app.extractors.common import RawImage, SourceExtract, table_to_text
 
 SCANNED_TEXT_THRESHOLD = 20
+# Long side of each page image sent to the AI: big enough to read slide tables and charts.
+PAGE_RENDER_PX = 1000
+PAGE_RENDER_QUALITY = 60
+
+
+def render_page(page: "pymupdf.Page") -> bytes:
+    zoom = PAGE_RENDER_PX / max(page.rect.width, page.rect.height)
+    pix = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), alpha=False)
+    return pix.tobytes(output="jpg", jpg_quality=PAGE_RENDER_QUALITY)
 
 
 def extract_pdf(data: bytes, name: str) -> SourceExtract:
@@ -35,6 +44,7 @@ def extract_pdf(data: bytes, name: str) -> SourceExtract:
                     if extracted and extracted.get("image"):
                         lines.append(out.add_image(RawImage(source=name, location=f"page {n}", data=extracted["image"])))
                         image_count += 1
+                out.page_renders.append((f"page {n}", render_page(mu_page)))
                 if image_count and len(text) < SCANNED_TEXT_THRESHOLD:
                     out.warnings.append(f"Page {n} looks scanned; its text wasn't read.")
                 pages_text.append("\n\n".join(lines))

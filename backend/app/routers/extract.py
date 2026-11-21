@@ -18,6 +18,12 @@ router = APIRouter()
 
 EXTRACTORS = {".docx": ("docx", extract_docx), ".pptx": ("pptx", extract_pptx), ".pdf": ("pdf", extract_pdf)}
 READ_ERROR = "This file couldn't be read. It may be corrupt or password-protected."
+# PowerPoint can't be rendered to page images on the server, so the AI only sees its text
+# and embedded pictures; a PDF export also lets it read tables and charts inside slides.
+PPTX_TIP = (
+    "Tip: for PowerPoint, save it as a PDF and upload that instead, so the AI can also read "
+    "tables, charts and flowcharts inside the slides."
+)
 
 
 async def _run(name: str, kind: str, fn, payload) -> tuple[SourceStatus, SourceExtract | None]:
@@ -81,11 +87,15 @@ async def extract(
                     ), None
                 else:
                     status, ex = await _run(name, file_kind, fn, data)
+                    if file_kind == "pptx" and status.ok:
+                        status.warnings.append(PPTX_TIP)
         statuses.append(status)
         if ex is not None:
             good.append((len(statuses) - 1, name, ex))
 
-    assembled = await run_in_threadpool(assemble, [(n, e) for _, n, e in good], settings.MAX_IMAGES_TO_AI)
+    assembled = await run_in_threadpool(
+        assemble, [(n, e) for _, n, e in good], settings.MAX_IMAGES_TO_AI, settings.MAX_PAGES_TO_AI
+    )
     for (status_index, _, _), extra in zip(good, assembled.warnings):
         statuses[status_index].warnings.extend(extra)
 
@@ -94,6 +104,7 @@ async def extract(
         text=assembled.text,
         images=assembled.images,
         embeds=assembled.embeds,
+        pages=assembled.pages,
         approx_tokens=len(assembled.text) // 4,
         token_limit=settings.TOKEN_WARN_LIMIT,
     )

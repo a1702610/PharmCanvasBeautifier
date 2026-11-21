@@ -65,6 +65,8 @@ Omit fields a block type doesn't use.
 
 Markers in the source: `[IMG-nn]` / `[IMG-nn: slide 7]` (thumbnails of most images are attached, labelled with their id; pasted Canvas images have no thumbnail) and `[EMBED-nn]`. For images with teaching content add a `figure` (`ref` = id, concise `alt` describing what it shows, `caption` = source if known). Skip decorative images. Never invent ids or URLs.
 
+**Full page images.** For PDF sources, a picture of every page is attached, labelled `Full image of SOURCE n (file name), page k:` to match the `--- Page k ---` marker in that source's text. Read each one: on slide decks much of the teaching content is only in the picture — tables, flowcharts, algorithms, charts, screenshots of guidelines, trial results and dose lists — and the extracted text holds little more than the slide title. Bring that content onto the page as text: tables as `table` blocks, algorithms and pathways as `flow` blocks or ordered lists, numbers and doses exactly as shown. Full page images are not figures: only `[IMG-nn]` ids can be used as a figure `ref`.
+
 # 7. Course context
 
 If a COURSE CONTEXT section is provided, use it to pitch the level and to connect content to the course's aims and learning outcomes (for example in clinical callouts). Do not reproduce course details on the page.
@@ -72,3 +74,11 @@ If a COURSE CONTEXT section is provided, use it to pitch the level and to connec
 # 8. Notes for the lecturer
 
 `notes` with `kind`: `image` (one per figure from a Word/PowerPoint/PDF source: id, where it came from, which tab), `flag` (possible errors, outdated content, inconsistencies between sources, gaps, copyright concerns — quote the original), `citation` (incomplete citations), `unplaced` (content you could not place or deliberately omitted). Leave empty if nothing to report.
+
+# 9. Coverage
+
+`coverage`: one entry for **every** `--- Slide n ---` or `--- Page n ---` marker in the source (sources without these markers need none). `source` is the SOURCE number, `unit` the slide/page number, and `status`:
+- `used` when that slide's substantive content — including content only in its full page image — is on the page;
+- `omitted` with a short `reason` when you left it out (e.g. "title slide", "repeats slide 10", "decorative image only").
+
+Never mark a slide `used` if its table, numbers, doses or key points are missing from the page. If something you could not fit matters, include it instead of omitting it. The app lists every slide you don't account for to the lecturer.
