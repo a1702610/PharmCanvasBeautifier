@@ -123,7 +123,7 @@ export function figureLines(block: FigureBlock, ctx: RenderContext, path?: strin
   const image = ctx.images[block.ref];
   const lines = image?.canvas_tag
     ? [`<p style="text-align: center;">${withAlt(image.canvas_tag, block.alt)}</p>`]
-    : [`<p style="${PLACEHOLDER_STYLE}">[ IMAGE ${escapeText(block.ref)}: ${renderInline(block.alt)}${image?.location ? `, ${escapeText(image.location)}` : ""} &mdash; delete this line and insert from Canvas Files ]</p>`];
+    : [`<p style="${PLACEHOLDER_STYLE}">[ IMAGE${block.ref ? ` ${escapeText(block.ref)}` : ""}: ${renderInline(block.alt)}${image?.location ? `, ${escapeText(image.location)}` : ""} &mdash; delete this line and insert from Canvas Files ]</p>`];
   if (block.caption) lines.push(...citationLines(block.caption, ctx, join(path, "caption")));
   return lines;
 }
@@ -174,13 +174,31 @@ function childLines(child: EvidenceChild, ctx: RenderContext, path?: string): st
 
 /** Blocks for a tab or accordion panel, with spacer paragraphs per spec §5. */
 export function contentLines(blocks: Block[], ctx: RenderContext, basePath?: string): string[] {
+  // Editor-only controls (never in the copied Canvas HTML): "+ Add" before each block and at
+  // the end, and each block wrapped with a delete button. See CanvasPreview's handleClick.
+  const controls = ctx.editable === true && basePath !== undefined;
   const out: string[] = [];
   blocks.forEach((b, i) => {
     if (i > 0 && (MAJOR.has(b.type) || MAJOR.has(blocks[i - 1].type))) out.push(SPACER);
-    out.push(...blockLines(b, ctx, join(basePath, i)));
+    const lines = blockLines(b, ctx, join(basePath, i));
+    if (controls) {
+      out.push(addSlot("add", basePath, i), '<div class="pc-block">', ...indent([deleteButton(`${basePath}.${i}`, "Delete this section"), ...lines]), "</div>");
+    } else {
+      out.push(...lines);
+    }
   });
+  if (controls) out.push(addSlot("add", basePath, blocks.length));
   out.push(SPACER);
   return out;
+}
+
+function addSlot(action: "add" | "add-panel", list: string, index: number): string {
+  const label = action === "add" ? "+ Add" : "+ Add collapsible panel";
+  return `<div class="pc-add"><button type="button" data-pc-action="${action}" data-pc-list="${escapeAttr(list)}" data-pc-index="${index}">${label}</button></div>`;
+}
+
+function deleteButton(path: string, label: string): string {
+  return `<button type="button" class="pc-del" data-pc-action="delete" data-pc-path="${escapeAttr(path)}" aria-label="${label}" title="${label}">&times;</button>`;
 }
 
 export function blockLines(block: Block, ctx: RenderContext, path?: string): string[] {
@@ -296,22 +314,27 @@ export function blockLines(block: Block, ctx: RenderContext, path?: string): str
         ]),
         "</div>",
       ];
-    case "accordion":
+    case "accordion": {
+      const controls = ctx.editable === true && path !== undefined;
       return [
         '<div class="dp-panels-wrapper dp-accordion-default">',
-        ...indent(
-          block.panels.flatMap((panel, i) => [
-            '<div class="dp-panel-group">',
-            ...indent([
-              `<h4 class="dp-panel-heading">${renderInline(panel.title)}</h4>`,
-              '<div class="dp-panel-content">',
-              ...indent(contentLines(panel.blocks, ctx, join(join(join(path, "panels"), i), "blocks"))),
+        ...indent([
+          ...block.panels.flatMap((panel, i) => {
+            const panelPath = join(join(path, "panels"), i);
+            const title = renderInline(panel.title);
+            const heading = controls
+              ? `<h4 class="dp-panel-heading"><span data-edit="${escapeAttr(`${panelPath}.title`)}">${title}</span>${deleteButton(panelPath!, "Delete this panel")}</h4>`
+              : `<h4 class="dp-panel-heading">${title}</h4>`;
+            return [
+              '<div class="dp-panel-group">',
+              ...indent([heading, '<div class="dp-panel-content">', ...indent(contentLines(panel.blocks, ctx, join(panelPath, "blocks"))), "</div>"]),
               "</div>",
-            ]),
-            "</div>",
-          ]),
-        ),
+            ];
+          }),
+          ...(controls ? [addSlot("add-panel", `${path}.panels`, block.panels.length)] : []),
+        ]),
         "</div>",
       ];
+    }
   }
 }

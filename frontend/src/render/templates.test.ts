@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Block } from "../types/page";
+import type { Block, InnerBlock } from "../types/page";
 import { blockLines, contentLines, SPACER, withAlt, type RenderContext } from "./templates";
 
 const ctx: RenderContext = {
@@ -320,5 +320,50 @@ describe("fix round 1 additions", () => {
     expect(re({ type: "counselling", items: ["i"] }, "p")).not.toMatch(/data-edit="p\.title"/);
     expect(re({ type: "counselling", title: "Custom", items: ["i"] }, "p")).toContain('<strong data-edit="p.title" style="color: #140f50;">Custom</strong>');
     expect(re({ type: "figure", ref: "IMG-02", alt: "A", caption: "Cap" }, "p")).toContain('data-edit="p.caption"');
+  });
+});
+
+describe("editor add/delete controls", () => {
+  const ed: RenderContext = { ...ctx, editable: true };
+  const para = (text: string): InnerBlock => ({ type: "paragraph", text });
+
+  it("non-editable content has no controls", () => {
+    const html = contentLines([para("a"), para("b")], ctx, "tabs.0.blocks").join("\n");
+    expect(html).not.toContain("data-pc-");
+    expect(html).not.toContain("pc-block");
+  });
+
+  it("editable content wraps each block with a delete button and puts an add slot before each block and at the end", () => {
+    const html = contentLines([para("a"), { type: "clinical", body: "c" }], ed, "tabs.0.blocks").join("\n");
+    for (const i of [0, 1, 2]) expect(html).toContain(`data-pc-action="add" data-pc-list="tabs.0.blocks" data-pc-index="${i}"`);
+    expect(html).not.toContain('data-pc-index="3"');
+    expect(html).toContain('<div class="pc-block">');
+    expect(html).toContain('data-pc-action="delete" data-pc-path="tabs.0.blocks.0"');
+    expect(html).toContain('data-pc-action="delete" data-pc-path="tabs.0.blocks.1"');
+    expect(html).toContain('<p data-edit="tabs.0.blocks.0.text">a</p>');
+  });
+
+  it("an empty list still gets one add slot", () => {
+    const html = contentLines([], ed, "tabs.0.blocks").join("\n");
+    expect(html).toContain('data-pc-list="tabs.0.blocks" data-pc-index="0"');
+  });
+
+  it("editable content without a path (e.g. study materials) has no controls", () => {
+    expect(contentLines([para("a")], ed).join("\n")).not.toContain("data-pc-");
+  });
+
+  it("accordion: editable panel titles, delete-panel buttons, add-panel slot and inner add slots", () => {
+    const acc: Block = { type: "accordion", panels: [{ title: "Worked example", blocks: [para("x")] }, { title: "Case", blocks: [] }] };
+    const html = blockLines(acc, ed, "tabs.0.blocks.2").join("\n");
+    expect(html).toContain('<span data-edit="tabs.0.blocks.2.panels.0.title">Worked example</span>');
+    expect(html).toContain('data-pc-action="delete" data-pc-path="tabs.0.blocks.2.panels.1"');
+    expect(html).toContain('data-pc-action="add-panel" data-pc-list="tabs.0.blocks.2.panels" data-pc-index="2"');
+    expect(html).toContain('data-pc-list="tabs.0.blocks.2.panels.1.blocks" data-pc-index="0"');
+    // Canvas output is unchanged
+    expect(blockLines(acc, ctx, "tabs.0.blocks.2").join("\n")).toContain('<h4 class="dp-panel-heading">Worked example</h4>');
+  });
+
+  it("a figure added in the editor (no image ref) renders a clean placeholder", () => {
+    expect(r({ type: "figure", ref: "", alt: "describe the image" })).toContain("[ IMAGE: describe the image &mdash;");
   });
 });

@@ -43,7 +43,8 @@ function groupLines(title: string, content: string[]): string[] {
 }
 
 function tabLines(tab: Tab, ctx: RenderContext, i: number): string[] {
-  return groupLines(`${i + 1}. ${renderInline(tab.title)}`, contentLines(tab.blocks, ctx, `tabs.${i}.blocks`));
+  const title = ctx.editable ? `<span data-edit="tabs.${i}.title">${renderInline(tab.title)}</span>` : renderInline(tab.title);
+  return groupLines(`${i + 1}. ${title}`, contentLines(tab.blocks, ctx, `tabs.${i}.blocks`));
 }
 
 function revisionLines(page: Page, ctx: RenderContext): string[] {
