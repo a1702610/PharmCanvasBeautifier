@@ -17,6 +17,7 @@ const LINE_BREAK = "\u0001";
 
 function collapseWhitespace(s: string): string {
   return normalizeNbsp(s)
+    .replace(/\u200b/g, "")
     .replace(/[ \t\n\r]+/g, " ")
     .replace(new RegExp(` *${LINE_BREAK}[ ${LINE_BREAK}]*`, "g"), LINE_BREAK)
     .replace(new RegExp(`^${LINE_BREAK}|${LINE_BREAK}$`, "g"), "")

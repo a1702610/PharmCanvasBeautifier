@@ -170,3 +170,26 @@
 
 /* An empty editable field (e.g. the new paragraph after Enter) still needs a line to click into. */
 .canvas-preview.is-editing [data-edit]:empty::before { content: "\200b"; }
+
+/* Tab controls (edit mode): move up/down and delete inside each teaching tab's button, and
+   "+ Add tab" below the teaching tabs. */
+.canvas-preview .dp-tabs-buttons-vertical > .pc-add-tab { grid-column: 1; justify-content: flex-start; margin: 0 0 8px; }
+.canvas-preview .pc-tab-ctl {
+  float: right;
+  width: 22px;
+  height: 22px;
+  margin-left: 4px;
+  border-radius: 999px;
+  border: 1px solid #ddd8ef;
+  background: #ffffff;
+  color: #140f50;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+}
+.canvas-preview .dp-panel-heading:hover > .pc-tab-ctl,
+.canvas-preview .dp-panel-group.is-active > .dp-panel-heading > .pc-tab-ctl,
+.canvas-preview .pc-tab-ctl:focus-visible { opacity: 1; }
+.canvas-preview .pc-tab-ctl[data-pc-action="delete-tab"] { color: #991b1b; }
+.canvas-preview .pc-tab-ctl:hover { background: #f4f2fb; }

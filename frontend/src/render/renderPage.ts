@@ -43,8 +43,21 @@ function groupLines(title: string, content: string[]): string[] {
   return ['<div class="dp-panel-group">', ...indent([`<h3 class="dp-panel-heading">${title}</h3>`, '<div class="dp-panel-content">', ...indent(content), "</div>"]), "</div>"];
 }
 
-function tabLines(tab: Tab, ctx: RenderContext, i: number): string[] {
-  const title = ctx.editable ? `<span data-edit="tabs.${i}.title"${enterAttr("none")}>${renderInline(tab.title)}</span>` : renderInline(tab.title);
+/** Editor-only buttons in a teaching tab's heading: move up/down and delete (not the only tab). */
+function tabControls(i: number, count: number): string {
+  const button = (action: string, extra: string, label: string, glyph: string) =>
+    `<button type="button" class="pc-tab-ctl" data-pc-action="${action}" data-pc-index="${i}"${extra} aria-label="${label}" title="${label}">${glyph}</button>`;
+  return [
+    i > 0 ? button("move-tab", ' data-pc-dir="-1"', "Move this tab up", "&uarr;") : "",
+    i < count - 1 ? button("move-tab", ' data-pc-dir="1"', "Move this tab down", "&darr;") : "",
+    count > 1 ? button("delete-tab", "", "Delete this tab", "&times;") : "",
+  ].join("");
+}
+
+function tabLines(tab: Tab, ctx: RenderContext, i: number, count: number): string[] {
+  const title = ctx.editable
+    ? `<span data-edit="tabs.${i}.title"${enterAttr("none")}>${renderInline(tab.title)}</span>${tabControls(i, count)}`
+    : renderInline(tab.title);
   return groupLines(`${i + 1}. ${title}`, contentLines(tab.blocks, ctx, `tabs.${i}.blocks`));
 }
 
@@ -90,7 +103,8 @@ export function renderPage(page: Page, ctx: RenderContext): string {
     page.revision.include ||
     !!(page.revision.embed_ref && ctx.embeds[page.revision.embed_ref]);
   const tabs = [
-    ...page.tabs.flatMap((t, i) => tabLines(t, ctx, i)),
+    ...page.tabs.flatMap((t, i) => tabLines(t, ctx, i, page.tabs.length)),
+    ...(ctx.editable ? ['<div class="pc-add pc-add-tab"><button type="button" data-pc-action="add-tab">+ Add tab</button></div>'] : []),
     ...groupLines(`${page.tabs.length + 1}. Study materials`, studyMaterialsContentLines(page, ctx)),
     ...(showRevision ? groupLines(`${page.tabs.length + 2}. Revision check`, revisionContentLines(page, ctx)) : []),
   ];

@@ -21,6 +21,9 @@ export type PreviewAction =
   | { kind: "add" | "add-panel" | "add-item"; list: string; index: number; anchor: DOMRect }
   | { kind: "delete" | "add-column"; path: string }
   | { kind: "delete-column"; path: string; index: number }
+  | { kind: "add-tab" }
+  | { kind: "delete-tab"; index: number }
+  | { kind: "move-tab"; index: number; dir: -1 | 1 }
   // Typing (see the data-enter / data-autolist markers in templates.ts):
   | { kind: "split"; path: string; before: string; after: string }
   | { kind: "to-list"; path: string; text: string; caretLine?: number }
@@ -114,6 +117,36 @@ function markdownOfRange(field: HTMLElement, from: { node: Node; offset: number 
   const holder = document.createElement("div");
   holder.appendChild(range.cloneContents());
   return htmlToMarkdown(holder);
+}
+
+/** Enter in a bullet inside a cell/callout: the text after the caret moves to a new bullet below;
+ *  on an empty last bullet the list ends and the caret goes on a new line after it. */
+function bulletEnter(li: HTMLElement) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const list = li.parentElement!;
+  const caret = document.createRange();
+  if (!(li.textContent ?? "").trim() && li === list.lastElementChild) {
+    li.remove();
+    // A zero-width space gives the caret somewhere to sit; it's stripped when the text is saved.
+    const line = document.createTextNode("\u200b");
+    list.after(line);
+    if (!list.children.length) list.remove();
+    caret.setStart(line, 1);
+  } else {
+    const tail = sel.getRangeAt(0).cloneRange();
+    tail.setEnd(li, li.childNodes.length);
+    const moved = tail.extractContents();
+    const next = document.createElement("li");
+    next.appendChild(moved);
+    if (!next.textContent) next.replaceChildren(document.createElement("br"));
+    if (!li.textContent) li.replaceChildren(document.createElement("br"));
+    li.after(next);
+    caret.setStart(next, 0);
+  }
+  caret.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(caret);
 }
 
 /** Replaces a just-typed "- " line start with a one-bullet list holding the rest of that text,
@@ -296,6 +329,12 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit, o
         onAction?.({ kind, path, index });
       } else if ((kind === "add" || kind === "add-panel" || kind === "add-item") && list) {
         onAction?.({ kind, list, index, anchor: control.getBoundingClientRect() });
+      } else if (kind === "add-tab") {
+        onAction?.({ kind });
+      } else if (kind === "delete-tab") {
+        onAction?.({ kind, index });
+      } else if (kind === "move-tab") {
+        onAction?.({ kind, index, dir: control.dataset.pcDir === "-1" ? -1 : 1 });
       }
       return;
     }
@@ -374,11 +413,15 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit, o
     if (!field || !path) return;
     const enter = field.dataset.enter;
     if (e.key === "Enter") {
-      // Inside a bullet list within a cell or callout, the browser's own Enter adds the next
-      // bullet (or ends the list on an empty one).
-      const li = (e.target as HTMLElement).closest("li");
-      if (li && field.contains(li) && field.dataset.bullets) return;
       e.preventDefault();
+      // Inside a bullet list within a cell or callout: next bullet, or end the list on an empty one.
+      const anchor = window.getSelection()?.anchorNode ?? null;
+      const anchorEl = anchor instanceof Element ? anchor : (anchor?.parentElement ?? null);
+      const li = anchorEl?.closest("li") ?? null;
+      if (li && field.contains(li) && field.dataset.bullets) {
+        bulletEnter(li);
+        return;
+      }
       if (enter === "none") return;
       if (enter === "split" && !e.shiftKey && onAction) {
         const { before, after } = splitAtCaret(field);

@@ -5,7 +5,6 @@ import { AddBlockMenu } from "../components/editor/AddBlockMenu";
 import { CanvasPreview, type FocusRequest, type PreviewAction } from "../components/editor/CanvasPreview";
 import { NotesPanel } from "../components/editor/NotesPanel";
 import { StudyMaterialsForm, emptyStudy } from "../components/study/StudyMaterialsForm";
-import { TabRail } from "../components/editor/TabRail";
 import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
 import { setAtPath } from "../render/editing";
@@ -16,6 +15,7 @@ import { replaceTab, undoTab, usedImageRefs } from "../storage/pageOps";
 import {
   addColumn,
   addTab,
+  moveTab,
   insertBlock,
   newBlock,
   newListItem,
@@ -186,6 +186,20 @@ export default function EditorPage() {
         return typingChange(action.path, (page) => paragraphLinesToBlocks(page, action.path, action.text, action.caretLine));
       case "remove-empty":
         return typingChange(action.path, (page) => removeEmpty(page, action.path));
+      case "add-tab":
+        return handleAddTab();
+      case "delete-tab":
+        setTabToDelete(action.index);
+        return;
+      case "move-tab": {
+        const base = savedRef.current ?? current;
+        const to = action.index + action.dir;
+        if (to < 0 || to >= base.page.tabs.length) return;
+        persist({ ...base, page: moveTab(base.page, action.index, action.dir) }).catch(() => toast.error("Couldn't move the tab."));
+        // Keep the moved tab (or the one it swapped with) selected where the user is looking.
+        setActiveIndex((active) => (active === action.index ? to : active === to ? action.index : active));
+        return;
+      }
     }
   }
 
@@ -251,7 +265,12 @@ export default function EditorPage() {
     return true;
   }
 
-  const historyCounts = Object.fromEntries(Object.entries(current.history).map(([k, v]) => [k, v.length]));
+  // ↶ undoes the last change to the tab being viewed (Study materials / Revision check have none).
+  const activeTab = current.page.tabs[activeIndex];
+  const canUndo = !!activeTab && (current.history[activeTab.id]?.length ?? 0) > 0;
+  function undoActiveTab() {
+    if (activeTab) persist(undoTab(savedRef.current ?? current, activeTab.id)).catch(() => toast.error("Couldn't undo."));
+  }
 
   return (
     <div>
@@ -270,15 +289,6 @@ export default function EditorPage() {
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[280px_1fr]">
         <div className="space-y-6">
-          <TabRail
-            tabs={current.page.tabs}
-            activeIndex={activeIndex}
-            historyCounts={historyCounts}
-            onSelect={(i) => { setActiveIndex(i); setView("preview"); }}
-            onUndo={(tab) => persist(undoTab(savedRef.current ?? current, tab.id)).catch(() => toast.error("Couldn't undo."))}
-            onAdd={handleAddTab}
-            onDelete={setTabToDelete}
-          />
           <NotesPanel notes={current.page.notes} />
         </div>
 
@@ -298,7 +308,10 @@ export default function EditorPage() {
                 </button>
               ))}
             </div>
-            <span className="text-xs text-ink-muted">Click any text to change it. Enter starts a new paragraph or point; type "- " for a bullet list. Use + Add and × to add or remove sections, rows, columns and points.</span>
+            <Button onClick={undoActiveTab} disabled={!canUndo} title={activeTab ? `Undo the last change to "${activeTab.title}"` : undefined}>
+              ↶ Undo
+            </Button>
+            <span className="text-xs text-ink-muted">Click any text to change it. Enter starts a new paragraph or point; type "- " for a bullet list. Use + Add and × to add or remove sections, rows, columns, points and tabs, and ↑ ↓ on a tab to move it.</span>
           </div>
           <div className="mt-4 rounded-2xl border border-line bg-white p-6 shadow-sm">
             {view === "preview" ? (

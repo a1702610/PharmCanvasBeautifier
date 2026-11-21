@@ -197,7 +197,7 @@ function nextTabId(tabs: Tab[]): string {
 }
 
 export function addTab(page: Page): Page {
-  const tab: Tab = { id: nextTabId(page.tabs), title: "New tab", blocks: [{ type: "paragraph", text: PARAGRAPH }] };
+  const tab: Tab = { id: nextTabId(page.tabs), title: "New tab", blocks: [] };
   return { ...page, tabs: [...page.tabs, tab] };
 }
 
@@ -206,12 +206,12 @@ export function removeTab(page: Page, index: number): Page {
 }
 
 /** A blank page in the house style for building a page by hand: a title, one intro paragraph
- *  and one tab to start from. Study materials and Revision check are added by the renderer. */
+ *  and one empty tab (the editor shows "+ Add" in it). Study materials and Revision check are added by the renderer. */
 export function blankPage(): Page {
   return {
     title: "Untitled page",
     intro: ["Say what this page covers and why it matters. Click to edit."],
-    tabs: [{ id: "t1", title: "New tab", blocks: [{ type: "paragraph", text: PARAGRAPH }] }],
+    tabs: [{ id: "t1", title: "New tab", blocks: [] }],
     revision: { include: false },
     notes: [],
   };
@@ -366,4 +366,13 @@ export function removeEmpty(page: Page, path: string): { page: Page; focus?: Foc
   const [, listPath, index] = item;
   const i = Number(index);
   return { page: removeEmptyItem(page, listPath, i), focus: i > 0 ? { path: `${listPath}.${i - 1}`, caret: "end" } : undefined };
+}
+
+/** Moves tab `index` one place up (dir -1) or down (dir 1); a move past either end does nothing. */
+export function moveTab(page: Page, index: number, dir: -1 | 1): Page {
+  const to = index + dir;
+  if (index < 0 || index >= page.tabs.length || to < 0 || to >= page.tabs.length) return page;
+  const tabs = page.tabs.slice();
+  [tabs[index], tabs[to]] = [tabs[to], tabs[index]];
+  return { ...page, tabs };
 }

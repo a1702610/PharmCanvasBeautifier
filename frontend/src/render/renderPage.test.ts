@@ -92,7 +92,7 @@ describe("renderPage", () => {
 
   it("editable mode makes teaching tab titles editable, but not the Study materials tab", () => {
     const html = renderPage(page, buildContext([], [], true));
-    expect(html).toContain('<h3 class="dp-panel-heading">1. <span data-edit="tabs.0.title" data-enter="none">Overview</span></h3>');
+    expect(html).toContain('<h3 class="dp-panel-heading">1. <span data-edit="tabs.0.title" data-enter="none">Overview</span>');
     expect(html).toContain('<h3 class="dp-panel-heading">3. Study materials</h3>');
     expect(renderPage(page, ctx)).toContain('<h3 class="dp-panel-heading">1. Overview</h3>');
   });
@@ -105,5 +105,38 @@ describe("prototype-key refs", () => {
     const html = renderPage(p, c);
     expect(html).not.toContain("Revision check");
     expect(html).toContain("[ IMAGE");
+  });
+});
+
+describe("tab controls in the editor", () => {
+  const three: Page = {
+    ...page,
+    tabs: [
+      { id: "t1", title: "A", blocks: [] },
+      { id: "t2", title: "B", blocks: [] },
+      { id: "t3", title: "C", blocks: [] },
+    ],
+  };
+
+  it("each teaching tab gets move and delete buttons; the ends can't move further", () => {
+    const html = renderPage(three, buildContext([], [], true));
+    expect(html).not.toContain('data-pc-action="move-tab" data-pc-index="0" data-pc-dir="-1"');
+    expect(html).toContain('data-pc-action="move-tab" data-pc-index="0" data-pc-dir="1"');
+    expect(html).toContain('data-pc-action="move-tab" data-pc-index="1" data-pc-dir="-1"');
+    expect(html).not.toContain('data-pc-action="move-tab" data-pc-index="2" data-pc-dir="1"');
+    expect(html).toContain('data-pc-action="delete-tab" data-pc-index="2"');
+  });
+
+  it("'+ Add tab' sits after the teaching tabs, before Study materials", () => {
+    const html = renderPage(three, buildContext([], [], true));
+    const add = html.indexOf('data-pc-action="add-tab"');
+    expect(add).toBeGreaterThan(html.indexOf("3. <span"));
+    expect(add).toBeLessThan(html.indexOf("4. Study materials"));
+  });
+
+  it("a page's only tab can't be deleted, and Canvas output has no tab controls", () => {
+    const one: Page = { ...three, tabs: [three.tabs[0]] };
+    expect(renderPage(one, buildContext([], [], true))).not.toContain("delete-tab");
+    expect(renderPage(three, buildContext([], []))).not.toContain("data-pc-");
   });
 });

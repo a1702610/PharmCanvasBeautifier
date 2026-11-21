@@ -544,14 +544,13 @@ describe("CanvasPreview: '- ' at the start of a later line", () => {
     done();
   });
 
-  it("Enter inside a bullet in a cell is left to the browser (new bullet)", () => {
-    const { container, done } = mount();
-    const td = container.querySelector<HTMLElement>("td")!;
-    td.innerHTML = "Cell<ul><li>a</li></ul>";
+  function enterInLi(td: HTMLElement, html: string, liIndex: number, offset: number) {
+    td.innerHTML = html;
     act(() => td.focus());
-    const li = td.querySelector("li")!;
+    const li = td.querySelectorAll("li")[liIndex];
     const range = document.createRange();
-    range.setStart(li.firstChild!, 1);
+    if (li.firstChild?.nodeType === Node.TEXT_NODE) range.setStart(li.firstChild, offset);
+    else range.setStart(li, 0);
     range.collapse(true);
     window.getSelection()!.removeAllRanges();
     window.getSelection()!.addRange(range);
@@ -559,7 +558,25 @@ describe("CanvasPreview: '- ' at the start of a later line", () => {
     act(() => {
       li.dispatchEvent(event);
     });
-    expect(event.defaultPrevented).toBe(false);
+    return event;
+  }
+
+  it("Enter inside a bullet in a cell splits it into a new bullet", () => {
+    const { container, done } = mount();
+    const td = container.querySelector<HTMLElement>("td")!;
+    const event = enterInLi(td, "Cell<ul><li>onetwo</li></ul>", 0, 3);
+    expect(event.defaultPrevented).toBe(true);
+    expect(Array.from(td.querySelectorAll("li")).map((li) => li.textContent)).toEqual(["one", "two"]);
+    done();
+  });
+
+  it("Enter on an empty last bullet in a cell ends the list", () => {
+    const { container, done } = mount();
+    const td = container.querySelector<HTMLElement>("td")!;
+    // The caret sits directly in the empty <li> (not in a text node), as after splitting a bullet.
+    enterInLi(td, "Cell<ul><li>one</li><li><br></li></ul>", 1, 0);
+    expect(td.querySelectorAll("li")).toHaveLength(1);
+    expect(td.lastChild?.nodeName).not.toBe("UL");
     done();
   });
 
@@ -572,5 +589,35 @@ describe("CanvasPreview: '- ' at the start of a later line", () => {
     expect(onEdit).not.toHaveBeenCalled();
     expect(onAction).toHaveBeenCalledWith({ kind: "to-list", path: "tabs.0.blocks.0.text", text: "Hello\n* a\n- b" });
     done();
+  });
+});
+
+describe("CanvasPreview: tab controls", () => {
+  it("reports add-tab, delete-tab and move-tab without selecting the tab", () => {
+    const html =
+      `<div class="dp-panels-wrapper dp-tabs-buttons-vertical">` +
+      `<div class="dp-panel-group"><h3 class="dp-panel-heading">1. A` +
+      `<button type="button" data-pc-action="move-tab" data-pc-index="0" data-pc-dir="1">v</button>` +
+      `<button type="button" data-pc-action="delete-tab" data-pc-index="0">x</button></h3><div class="dp-panel-content"></div></div>` +
+      `<div class="pc-add pc-add-tab"><button type="button" data-pc-action="add-tab">+ Add tab</button></div>` +
+      `</div>`;
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const onAction = vi.fn();
+    const onSelect = vi.fn();
+    act(() => {
+      root.render(<CanvasPreview html={html} activeIndex={0} editable onSelect={onSelect} onEdit={() => true} onAction={onAction} />);
+    });
+    const click = (sel: string) => act(() => (container.querySelector(sel) as HTMLElement).click());
+    click('[data-pc-action="move-tab"]');
+    expect(onAction).toHaveBeenLastCalledWith({ kind: "move-tab", index: 0, dir: 1 });
+    click('[data-pc-action="delete-tab"]');
+    expect(onAction).toHaveBeenLastCalledWith({ kind: "delete-tab", index: 0 });
+    click('[data-pc-action="add-tab"]');
+    expect(onAction).toHaveBeenLastCalledWith({ kind: "add-tab" });
+    expect(onSelect).not.toHaveBeenCalled();
+    act(() => root.unmount());
+    container.remove();
   });
 });

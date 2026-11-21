@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { InnerBlock, Page } from "../types/page";
 import { buildContext, renderPage } from "../render/renderPage";
-import { addColumn, addTab, blankPage, blockChoices, insertBlock, newBlock, newListItem, newPanel, removeColumn, paragraphLinesToBlocks, removeEmpty, removeItem, removeTab, splitText } from "./structureOps";
+import { addColumn, addTab, blankPage, blockChoices, insertBlock, newBlock, newListItem, newPanel, removeColumn, moveTab, paragraphLinesToBlocks, removeEmpty, removeItem, removeTab, splitText } from "./structureOps";
 
 const p = (text: string): InnerBlock => ({ type: "paragraph", text });
 const page: Page = {
@@ -101,7 +101,7 @@ describe("addTab / removeTab", () => {
     expect(added.id).not.toBe("t1");
     expect(added.id).not.toBe("t2");
     expect(added.title).toBe("New tab");
-    expect(added.blocks.length).toBeGreaterThan(0);
+    expect(added.blocks).toEqual([]);
     expect(addTab(next).tabs[3].id).not.toBe(added.id);
   });
 
@@ -180,7 +180,7 @@ describe("blankPage", () => {
     expect(blank.intro).toHaveLength(1);
     expect(blank.tabs).toHaveLength(1);
     expect(blank.tabs[0].title).toBe("New tab");
-    expect(blank.tabs[0].blocks.length).toBeGreaterThan(0);
+    expect(blank.tabs[0].blocks).toEqual([]);
     expect(blank.revision).toEqual({ include: false });
     expect(blank.notes).toEqual([]);
     expect(blankPage()).not.toBe(blank);
@@ -304,5 +304,15 @@ describe("paragraphLinesToBlocks", () => {
     const { page, focus } = paragraphLinesToBlocks(one(""), "tabs.0.blocks.0.text", "Hello\n- ", 1);
     expect(blocksOf(page)).toEqual([{ type: "paragraph", text: "Hello" }, { type: "list", ordered: false, items: [""] }]);
     expect(focus).toEqual({ path: "tabs.0.blocks.1.items.0", caret: "start" });
+  });
+});
+
+describe("moveTab", () => {
+  it("moves a tab up or down and ignores moves past the ends", () => {
+    const ids = (p: Page) => p.tabs.map((t) => t.id);
+    expect(ids(moveTab(page, 1, -1))).toEqual(["t2", "t1"]);
+    expect(ids(moveTab(page, 0, 1))).toEqual(["t2", "t1"]);
+    expect(moveTab(page, 0, -1)).toBe(page);
+    expect(moveTab(page, 1, 1)).toBe(page);
   });
 });
