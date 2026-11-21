@@ -36,3 +36,10 @@ def test_system_prompt_explains_page_images_and_coverage():
     assert "Full image of SOURCE" in s
     assert "coverage" in s
     assert "omitted" in s
+
+
+def test_system_prompt_keeps_diagrams_as_figures_and_rebuilds_table_images():
+    s = load_prompt("system")
+    assert "Diagrams, pathways, charts, illustrations and photos" in s
+    assert "even when you also explain" in s
+    assert "rebuilt as a table" in s

@@ -63,7 +63,12 @@ Omit fields a block type doesn't use.
 
 # 6. Images and embeds
 
-Markers in the source: `[IMG-nn]` / `[IMG-nn: slide 7]` (thumbnails of most images are attached, labelled with their id; pasted Canvas images have no thumbnail) and `[EMBED-nn]`. For images with teaching content add a `figure` (`ref` = id, concise `alt` describing what it shows, `caption` = source if known). Skip decorative images. Never invent ids or URLs.
+Markers in the source: `[IMG-nn]` / `[IMG-nn: slide 7]` (thumbnails of most images are attached, labelled with their id; pasted Canvas images have no thumbnail) and `[EMBED-nn]`. Decide per image:
+- **Tables or blocks of text shown as a picture** (screenshots of tables, guideline excerpts, dose lists): rebuild the content as a `table` or text and do not add the image as a figure.
+- **Diagrams, pathways, charts, illustrations and photos** with teaching content: add a `figure` where it belongs (`ref` = id, concise `alt` describing what it shows, `caption` = source if known), even when you also explain the content in text or a `flow` — students should still see the picture.
+- **Decorative images** (logos, stock photos, backgrounds): skip.
+
+Add one `image` note per image saying what you did: placed as a figure (and in which tab), rebuilt as a table, or skipped as decorative. If a placed diagram comes from a textbook, guideline or other publisher, add a `flag` note reminding the lecturer to check they may reuse it. Never invent ids or URLs.
 
 **Full page images.** For PDF sources, a picture of every page is attached, labelled `Full image of SOURCE n (file name), page k:` to match the `--- Page k ---` marker in that source's text. Read each one: on slide decks much of the teaching content is only in the picture — tables, flowcharts, algorithms, charts, screenshots of guidelines, trial results and dose lists — and the extracted text holds little more than the slide title. Bring that content onto the page as text: tables as `table` blocks, algorithms and pathways as `flow` blocks or ordered lists, numbers and doses exactly as shown. Full page images are not figures: only `[IMG-nn]` ids can be used as a figure `ref`.
 
