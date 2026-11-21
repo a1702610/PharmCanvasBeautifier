@@ -104,3 +104,27 @@ def test_generate_limits_page_images(calls):
     page = {"source_index": 1, "source": "a.pdf", "location": "page 1", "data_b64": base64.b64encode(b"x").decode()}
     response = client.post("/api/generate", json={"text": TEXT, "pages": [page] * 201}, headers=HEADERS)
     assert response.status_code == 422
+
+
+def test_generate_uses_flash_by_default_and_pro_when_asked(calls):
+    from app.config import settings
+
+    calls.outcome["value"] = wire_page()
+    assert client.post("/api/generate", json={"text": TEXT}, headers=HEADERS).status_code == 200
+    assert calls[-1]["model"] == settings.GEMINI_MODEL
+    assert client.post("/api/generate", json={"text": TEXT, "model": "pro"}, headers=HEADERS).status_code == 200
+    assert calls[-1]["model"] == settings.GEMINI_PRO_MODEL
+    assert settings.GEMINI_PRO_MODEL != settings.GEMINI_MODEL
+
+
+def test_generate_rejects_unknown_model_choices(calls):
+    response = client.post("/api/generate", json={"text": TEXT, "model": "gemini-ultra"}, headers=HEADERS)
+    assert response.status_code == 422
+
+
+def test_pro_with_a_key_that_cannot_use_it_explains_billing(calls):
+    calls.outcome["value"] = gemini.GeminiError(gemini.RATE_MESSAGE, 429)
+    response = client.post("/api/generate", json={"text": TEXT, "model": "pro"}, headers=HEADERS)
+    assert response.status_code == 429
+    detail = response.json()["detail"]
+    assert "billing" in detail and "Flash" in detail

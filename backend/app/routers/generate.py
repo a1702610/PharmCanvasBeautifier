@@ -1,6 +1,8 @@
 import base64
 import binascii
 
+from typing import Literal
+
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
@@ -34,6 +36,8 @@ class GenerateRequest(BaseModel):
     include_revision: bool = False
     title: str = ""
     course_context: str = ""
+    # "flash" (default, works with a free key) or "pro" (more thorough; needs billing).
+    model: Literal["flash", "pro"] = "flash"
 
     @field_validator("course_context")
     @classmethod
@@ -44,6 +48,12 @@ class GenerateRequest(BaseModel):
 class GenerateResponse(BaseModel):
     page: Page
 
+
+
+PRO_KEY_MESSAGE = (
+    "Gemini Pro needs a key with billing turned on (Google has no free tier for Pro). "
+    "Turn on billing in Google AI Studio, or choose Flash and try again."
+)
 
 
 def _require_key(key: str | None) -> str:
@@ -89,8 +99,12 @@ async def generate(req: GenerateRequest, x_gemini_key: str | None = Header(defau
             prompt=build_generate_prompt(req.title, req.include_revision, req.instructions, req.text, course_context=req.course_context),
             images=_page_parts(req.pages) + _image_parts(req.images),
             schema=WirePage,
+            model=settings.GEMINI_PRO_MODEL if req.model == "pro" else settings.GEMINI_MODEL,
         )
     except gemini.GeminiError as exc:
+        # A free key asking for Pro comes back as a quota (429) error.
+        if req.model == "pro" and exc.status_code == 429:
+            raise HTTPException(429, PRO_KEY_MESSAGE)
         raise HTTPException(exc.status_code, exc.message)
     page = finalize_page(wire, SourceContext.from_text(req.text), include_revision=req.include_revision)
     if not page.tabs:

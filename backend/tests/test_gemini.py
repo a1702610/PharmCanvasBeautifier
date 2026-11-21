@@ -128,3 +128,13 @@ def test_images_are_labelled_parts():
     assert parts[0].text == "p"
     assert parts[1].text == "Image IMG-01 (slide 2):"
     assert parts[2].inline_data.mime_type == "image/jpeg"
+
+
+def test_uses_the_requested_model():
+    models = FakeModels(['{"title": "ok"}'])
+    client = SimpleNamespace(aio=SimpleNamespace(models=models))
+    asyncio.run(gemini.generate_structured(
+        api_key="k", system_prompt="sys", prompt="p", images=[], schema=Small,
+        model="gemini-pro-x", client_factory=lambda key: client,
+    ))
+    assert models.calls[0]["model"] == "gemini-pro-x"

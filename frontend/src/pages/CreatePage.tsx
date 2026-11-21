@@ -5,6 +5,7 @@ import { getApiErrorMessage } from "../api/client";
 import { extractSources, generatePage } from "../api/endpoints";
 import { Dropzone } from "../components/create/Dropzone";
 import { GenerateProgress, type Stage } from "../components/create/GenerateProgress";
+import { loadModelChoice, ModelChoice, saveModelChoice, type ModelChoiceValue } from "../components/create/ModelChoice";
 import { PasteCanvasModal } from "../components/create/PasteCanvasModal";
 import { SourceList } from "../components/create/SourceList";
 import { CourseManagerModal } from "../components/courses/CourseManagerModal";
@@ -34,6 +35,7 @@ export default function CreatePage() {
   const [courseManagerOpen, setCourseManagerOpen] = useState(false);
   const [study, setStudy] = useState<StudyMaterials>(emptyStudy());
   const [studyOpen, setStudyOpen] = useState(false);
+  const [model, setModel] = useState<ModelChoiceValue>(loadModelChoice);
   const busy = stage !== "idle";
 
   const loadCourses = useCallback(() => {
@@ -116,6 +118,7 @@ export default function CreatePage() {
         include_revision: includeRevision,
         title,
         course_context: buildCourseContext(course),
+        model,
       });
       setStage("building");
       const notes = sourceNotes(result.sources);
@@ -188,6 +191,14 @@ export default function CreatePage() {
             </label>
             <Button variant="ghost" className="mt-1" disabled={busy} onClick={() => setCourseManagerOpen(true)}>Manage courses</Button>
           </div>
+          <ModelChoice
+            value={model}
+            disabled={busy}
+            onChange={(value) => {
+              setModel(value);
+              saveModelChoice(value);
+            }}
+          />
           <label className="mt-4 block text-sm font-medium">
             Page title <span className="font-normal text-ink-muted">(optional)</span>
             <input

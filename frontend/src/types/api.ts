@@ -56,6 +56,8 @@ export interface GenerateRequest {
   include_revision: boolean;
   title: string;
   course_context: string;
+  /** "flash" (default, free key) or "pro" (needs billing). */
+  model: "flash" | "pro";
 }
 
 export type SourceInput =

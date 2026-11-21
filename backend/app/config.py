@@ -3,6 +3,8 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-3.6-flash"
+    # Used when a lecturer picks "Pro" on the Create page (needs a key with billing turned on).
+    GEMINI_PRO_MODEL: str = "gemini-3.1-pro-preview"
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
     MAX_SOURCES: int = 5
     MAX_FILE_MB: int = 25

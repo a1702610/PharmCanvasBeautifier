@@ -67,6 +67,7 @@ async def generate_structured(
     prompt: str,
     images: list[ImagePart],
     schema: type[T],
+    model: str | None = None,
     client_factory: Callable[[str], object] = _build_client,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
 ) -> T:
@@ -86,7 +87,7 @@ async def generate_structured(
     while attempt < ATTEMPTS:
         try:
             response = await client.aio.models.generate_content(
-                model=settings.GEMINI_MODEL, contents=contents, config=config,
+                model=model or settings.GEMINI_MODEL, contents=contents, config=config,
             )
         except Exception as exc:
             kind = _classify(exc)
