@@ -32,9 +32,15 @@ describe("renderPage", () => {
     expect(html.indexOf("</table>")).toBeLessThan(html.indexOf("    <p>&nbsp;</p>\n    <div class=\"dp-panels-wrapper"));
   });
 
-  it("revision check with points, no flow diagram", () => {
+  it("revision check is the last tab, after Study materials, with points and no flow diagram", () => {
     const html = renderPage(page, ctx);
-    expect(html).toContain('<h2 style="margin: 0 0 8px 0; color: #140f50;">Revision check</h2>');
+    expect(html).toContain('<h3 class="dp-panel-heading">4. Revision check</h3>');
+    expect(html.indexOf("3. Study materials")).toBeLessThan(html.indexOf("4. Revision check"));
+    expect(html).not.toContain("<hr");
+    expect(html).not.toContain("<h2 style=\"margin: 0 0 8px 0; color: #140f50;\">Revision check</h2>");
+    expect(html).toContain("Before moving on, check that these ideas can be <strong>explained</strong>, rather than simply recalled.");
+    // The revision tab lives inside the tabs wrapper, which is followed by one spacer and the page end.
+    expect(html.trimEnd().endsWith("    </div>\n    <p>&nbsp;</p>\n</div>")).toBe(true);
     expect(html).toContain('<td style="width: 44px; padding: 12px; text-align: center; color: #d97706; border: 1px solid #cbd5e1;">1</td>');
     expect(html).not.toContain("&rarr;");
     expect(html).not.toContain("[PASTE H5P EMBED HERE]");
@@ -52,7 +58,6 @@ describe("renderPage", () => {
     expect(withEmbed).not.toContain('color: #d97706; border: 1px solid #cbd5e1;">1</td>');
     const none = renderPage({ ...page, revision: { include: false } }, ctx);
     expect(none).not.toContain("Revision check");
-    expect(none).not.toContain("<hr");
   });
 
   it("dangling embed_ref with nothing else renders no revision", () => {
@@ -65,6 +70,12 @@ describe("renderPage", () => {
     const html = renderPage(legacy, buildContext([], []));
     expect(html).toContain("2. Study materials");
     expect(html).toContain("[PASTE H5P EMBED HERE]");
+  });
+
+  it("in edit mode the Revision check tab is always shown so points can be added", () => {
+    const html = renderPage({ ...page, revision: { include: false } }, buildContext([], [], true));
+    expect(html).toContain("4. Revision check");
+    expect(html).toContain('data-pc-action="add-item" data-pc-list="revision.points" data-pc-index="0"');
   });
 
   it("editable mode marks intro paragraphs and revision points, never spacers", () => {

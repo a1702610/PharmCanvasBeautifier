@@ -16,8 +16,9 @@ import { sanitizePreviewHtml } from "../../render/sanitize";
 /** A click on one of the editor's add/delete controls (rendered only in edit mode; see
  *  contentLines in templates.ts). `list` is the dot path of the list to insert into. */
 export type PreviewAction =
-  | { kind: "add" | "add-panel"; list: string; index: number; anchor: DOMRect }
-  | { kind: "delete"; path: string };
+  | { kind: "add" | "add-panel" | "add-item"; list: string; index: number; anchor: DOMRect }
+  | { kind: "delete" | "add-column"; path: string }
+  | { kind: "delete-column"; path: string; index: number };
 
 interface Props {
   html: string;
@@ -172,11 +173,14 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit, o
     const control = (e.target as HTMLElement).closest<HTMLElement>("[data-pc-action]");
     if (control && editable) {
       e.preventDefault();
-      const kind = control.dataset.pcAction;
-      if (kind === "delete" && control.dataset.pcPath) {
-        onAction?.({ kind, path: control.dataset.pcPath });
-      } else if ((kind === "add" || kind === "add-panel") && control.dataset.pcList) {
-        onAction?.({ kind, list: control.dataset.pcList, index: Number(control.dataset.pcIndex ?? 0), anchor: control.getBoundingClientRect() });
+      const { pcAction: kind, pcPath: path, pcList: list } = control.dataset;
+      const index = Number(control.dataset.pcIndex ?? 0);
+      if ((kind === "delete" || kind === "add-column") && path) {
+        onAction?.({ kind, path });
+      } else if (kind === "delete-column" && path) {
+        onAction?.({ kind, path, index });
+      } else if ((kind === "add" || kind === "add-panel" || kind === "add-item") && list) {
+        onAction?.({ kind, list, index, anchor: control.getBoundingClientRect() });
       }
       return;
     }

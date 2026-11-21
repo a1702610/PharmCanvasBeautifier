@@ -64,7 +64,15 @@ function cellLines(tag: "td" | "th", style: string, content: string, ctx: Render
 export function simpleTableLines(
   headers: string[],
   rows: string[][],
-  opts: { variant?: "primary" | "secondary"; rowHeaders?: boolean; widths?: (number | undefined)[]; headerPaths?: (string | undefined)[]; cellPath?: (r: number, c: number) => string | undefined },
+  opts: {
+    variant?: "primary" | "secondary";
+    rowHeaders?: boolean;
+    widths?: (number | undefined)[];
+    headerPaths?: (string | undefined)[];
+    cellPath?: (r: number, c: number) => string | undefined;
+    /** Edit mode: the table block's path, for row/column add and delete controls. */
+    controlsPath?: string;
+  },
   ctx: RenderContext,
 ): string[] {
   const secondary = opts.variant === "secondary";
@@ -75,11 +83,26 @@ export function simpleTableLines(
     const w = opts.widths?.[i] === undefined ? "" : ` width: ${pct(opts.widths[i]!)};`;
     return `<th${editAttr(ctx, opts.headerPaths?.[i])} style="padding: 11px; text-align: left;${w} border: 1px solid ${P.border};" scope="col">${renderInline(h)}</th>`;
   });
+  const tp = opts.controlsPath;
+  const columnControls = tp
+    ? [
+        '<tr class="pc-ctl-row">',
+        ...indent([
+          ...headers.map((_, i) =>
+            headers.length > 1
+              ? `<th class="pc-ctl"><button type="button" class="pc-del pc-inline-del" data-pc-action="delete-column" data-pc-path="${escapeAttr(tp)}" data-pc-index="${i}" aria-label="Delete this column" title="Delete this column">&times;</button></th>`
+              : '<th class="pc-ctl"></th>',
+          ),
+          `<th class="pc-ctl"><button type="button" class="pc-add-col" data-pc-action="add-column" data-pc-path="${escapeAttr(tp)}" aria-label="Add a column" title="Add a column">+</button></th>`,
+        ]),
+        "</tr>",
+      ]
+    : [];
   return [
     '<table style="width: 100%; border-collapse: collapse; margin: 18px 0;">',
     ...indent([
       "<thead>",
-      ...indent([`<tr style="background: ${headBg}; color: #ffffff;">`, ...indent(headerCells), "</tr>"]),
+      ...indent([...columnControls, `<tr style="background: ${headBg}; color: #ffffff;">`, ...indent([...headerCells, ...(tp ? ['<th class="pc-ctl"></th>'] : [])]), "</tr>"]),
       "</thead>",
       "<tbody>",
       ...indent(
@@ -92,18 +115,29 @@ export function simpleTableLines(
                 : cellLines("td", CELL, cell, ctx, opts.cellPath?.(r, c)),
             ),
           ),
+          ...(tp ? indent([rowDeleteCell(`${tp}.rows.${r}`)]) : []),
           "</tr>",
         ]),
       ),
       "</tbody>",
     ]),
     "</table>",
+    ...(tp ? [addSlot("add-item", `${tp}.rows`, rows.length, "+ Add row")] : []),
   ];
 }
 
 function listLines(items: string[], ordered: boolean, ctx: RenderContext, itemsPath?: string, style?: string): string[] {
   const tag = ordered ? "ol" : "ul";
-  return [`<${tag}${style ? ` style="${style}"` : ""}>`, ...indent(items.map((i, idx) => `<li${editAttr(ctx, join(itemsPath, idx))}>${renderInline(i)}</li>`)), `</${tag}>`];
+  const open = `<${tag}${style ? ` style="${style}"` : ""}>`;
+  if (!controlsOn(ctx, itemsPath)) {
+    return [open, ...indent(items.map((i, idx) => `<li${editAttr(ctx, join(itemsPath, idx))}>${renderInline(i)}</li>`)), `</${tag}>`];
+  }
+  // Edit mode: the text goes in its own editable span so the x beside it isn't part of the text.
+  const lis = items.map((i, idx) => {
+    const itemPath = `${itemsPath}.${idx}`;
+    return `<li><span data-edit="${escapeAttr(itemPath)}">${renderInline(i)}</span> ${deleteButton(itemPath, "Delete this point", true)}</li>`;
+  });
+  return [open, ...indent(lis), `</${tag}>`, addSlot("add-item", itemsPath, items.length, "+ Add point")];
 }
 
 function citationLines(text: string, ctx: RenderContext, path?: string): string[] {
@@ -132,7 +166,8 @@ export function flowRowLines(flow: FlowBlock, ctx: RenderContext, path?: string)
   const items = flow.steps.flatMap((s, i) => {
     const stepPath = join(join(path, "steps"), i);
     const sub = s.sub ? `<br /><span${editAttr(ctx, join(stepPath, "sub"))} style="font-size: 0.9em;">${renderInline(s.sub)}</span>` : "";
-    const step = `<div style="${STEP_STYLE[s.style] ?? STEP_STYLE.outline}"><strong${editAttr(ctx, join(stepPath, "label"))}>${renderInline(s.label)}</strong>${sub}</div>`;
+    const del = controlsOn(ctx, stepPath) && flow.steps.length > 2 ? ` ${deleteButton(stepPath, "Delete this step", true)}` : "";
+    const step = `<div style="${STEP_STYLE[s.style] ?? STEP_STYLE.outline}"><strong${editAttr(ctx, join(stepPath, "label"))}>${renderInline(s.label)}</strong>${sub}${del}</div>`;
     return i === 0 ? [step] : [ARROW, step];
   });
   return ['<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; text-align: center;">', ...indent(items), "</div>"];
@@ -192,13 +227,26 @@ export function contentLines(blocks: Block[], ctx: RenderContext, basePath?: str
   return out;
 }
 
-function addSlot(action: "add" | "add-panel", list: string, index: number): string {
-  const label = action === "add" ? "+ Add" : "+ Add collapsible panel";
+/** Editor-only controls are rendered when editing and the element has a data path. */
+function controlsOn(ctx: RenderContext, path: string | undefined): path is string {
+  return ctx.editable === true && path !== undefined;
+}
+
+/** "+ Add…" button that inserts into the list at `list` (a dot path) at `index`: "add" opens
+ *  the section menu, "add-panel" adds an accordion panel, "add-item" adds a point/row/question/step. */
+export function addSlot(action: "add" | "add-panel" | "add-item", list: string, index: number, label = "+ Add"): string {
   return `<div class="pc-add"><button type="button" data-pc-action="${action}" data-pc-list="${escapeAttr(list)}" data-pc-index="${index}">${label}</button></div>`;
 }
 
-function deleteButton(path: string, label: string): string {
-  return `<button type="button" class="pc-del" data-pc-action="delete" data-pc-path="${escapeAttr(path)}" aria-label="${label}" title="${label}">&times;</button>`;
+/** × button deleting the list entry at `path`. Inline buttons sit next to their item instead of
+ *  floating in a section's corner. */
+export function deleteButton(path: string, label: string, inline = false): string {
+  return `<button type="button" class="pc-del${inline ? " pc-inline-del" : ""}" data-pc-action="delete" data-pc-path="${escapeAttr(path)}" aria-label="${label}" title="${label}">&times;</button>`;
+}
+
+/** Control cell ending a table row in edit mode (kept out of the editable cells). */
+export function rowDeleteCell(path: string): string {
+  return `<td class="pc-ctl">${deleteButton(path, "Delete this row", true)}</td>`;
 }
 
 export function blockLines(block: Block, ctx: RenderContext, path?: string): string[] {
@@ -217,26 +265,46 @@ export function blockLines(block: Block, ctx: RenderContext, path?: string): str
         widths,
         headerPaths: block.headers.map((_, i) => join(join(path, "headers"), i)),
         cellPath: (r, c) => join(join(join(path, "rows"), r), c),
+        controlsPath: controlsOn(ctx, path) ? path : undefined,
       }, ctx);
     }
     case "contrast_table": {
       const head = (text: string, bg: string, key: string) =>
         `<th${editAttr(ctx, join(path, key))} style="padding: 11px; text-align: left; width: 50%; background: ${bg}; color: #ffffff; border: 1px solid ${P.border};" scope="col">${renderInline(text)}</th>`;
+      const controls = controlsOn(ctx, path);
       return [
         '<table style="width: 100%; border-collapse: collapse; margin: 18px 0;">',
         ...indent([
           "<thead>",
-          ...indent(["<tr>", ...indent([head(block.left_header, P.purple, "left_header"), head(block.right_header, P.amberDark, "right_header")]), "</tr>"]),
+          ...indent([
+            "<tr>",
+            ...indent([head(block.left_header, P.purple, "left_header"), head(block.right_header, P.amberDark, "right_header"), ...(controls ? ['<th class="pc-ctl"></th>'] : [])]),
+            "</tr>",
+          ]),
           "</thead>",
           "<tbody>",
-          ...indent(block.rows.flatMap((row, r) => ["<tr>", ...indent(row.flatMap((cell, c) => cellLines("td", CELL, cell, ctx, join(join(join(path, "rows"), r), c)))), "</tr>"])),
+          ...indent(
+            block.rows.flatMap((row, r) => [
+              "<tr>",
+              ...indent([
+                ...row.flatMap((cell, c) => cellLines("td", CELL, cell, ctx, join(join(join(path, "rows"), r), c))),
+                ...(controls ? [rowDeleteCell(`${path}.rows.${r}`)] : []),
+              ]),
+              "</tr>",
+            ]),
+          ),
           "</tbody>",
         ]),
         "</table>",
+        ...(controls ? [addSlot("add-item", `${path}.rows`, block.rows.length, "+ Add row")] : []),
       ];
     }
     case "flow":
-      return ['<div style="margin: 24px 0;">', ...indent(flowRowLines(block, ctx, path)), "</div>"];
+      return [
+        '<div style="margin: 24px 0;">',
+        ...indent([...flowRowLines(block, ctx, path), ...(controlsOn(ctx, path) ? [addSlot("add-item", `${path}.steps`, block.steps.length, "+ Add step")] : [])]),
+        "</div>",
+      ];
     case "formula":
       return [
         `<div style="margin: 18px auto; padding: 16px; max-width: 440px; text-align: center; background: ${P.lavender}; border-radius: 8px; border: 1px solid ${P.lavenderBorder};">`,
@@ -303,7 +371,9 @@ export function blockLines(block: Block, ctx: RenderContext, path?: string): str
         ...indent([
           `<p style="margin: 0 0 8px 0;"><strong style="color: ${P.purple};">Check your understanding</strong></p>`,
           ...block.questions.flatMap((q, i) => [
-            `<p style="margin: 10px 0 4px 0;"><strong>${i + 1}.</strong> ${editSpan(ctx, join(join(join(path, "questions"), i), "question"), renderInline(q.question))}</p>`,
+            `<p style="margin: 10px 0 4px 0;"><strong>${i + 1}.</strong> ${editSpan(ctx, join(join(join(path, "questions"), i), "question"), renderInline(q.question))}${
+              controlsOn(ctx, path) ? ` ${deleteButton(`${path}.questions.${i}`, "Delete this question", true)}` : ""
+            }</p>`,
             "<details>",
             ...indent([
               `<summary style="cursor: pointer; color: ${P.purple};">Show answer</summary>`,
@@ -311,6 +381,7 @@ export function blockLines(block: Block, ctx: RenderContext, path?: string): str
             ]),
             "</details>",
           ]),
+          ...(controlsOn(ctx, path) ? [addSlot("add-item", `${path}.questions`, block.questions.length, "+ Add question")] : []),
         ]),
         "</div>",
       ];
@@ -331,7 +402,7 @@ export function blockLines(block: Block, ctx: RenderContext, path?: string): str
               "</div>",
             ];
           }),
-          ...(controls ? [addSlot("add-panel", `${path}.panels`, block.panels.length)] : []),
+          ...(controls ? [addSlot("add-panel", `${path}.panels`, block.panels.length, "+ Add collapsible panel")] : []),
         ]),
         "</div>",
       ];

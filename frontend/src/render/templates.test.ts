@@ -316,7 +316,7 @@ describe("fix round 1 additions", () => {
     const c = re({ type: "caution", title: "T", body: "B", items: ["i"] }, "p");
     expect(c).toContain('<strong data-edit="p.title">T</strong>');
     expect(c).toContain('<span data-edit="p.body">B</span>');
-    expect(c).toContain('<li data-edit="p.items.0">i</li>');
+    expect(c).toContain('<li><span data-edit="p.items.0">i</span>');
     expect(re({ type: "counselling", items: ["i"] }, "p")).not.toMatch(/data-edit="p\.title"/);
     expect(re({ type: "counselling", title: "Custom", items: ["i"] }, "p")).toContain('<strong data-edit="p.title" style="color: #140f50;">Custom</strong>');
     expect(re({ type: "figure", ref: "IMG-02", alt: "A", caption: "Cap" }, "p")).toContain('data-edit="p.caption"');
@@ -365,5 +365,59 @@ describe("editor add/delete controls", () => {
 
   it("a figure added in the editor (no image ref) renders a clean placeholder", () => {
     expect(r({ type: "figure", ref: "", alt: "describe the image" })).toContain("[ IMAGE: describe the image &mdash;");
+  });
+});
+
+describe("editor controls inside sections", () => {
+  const ed: RenderContext = { ...ctx, editable: true };
+  const re = (b: Block, path = "tabs.0.blocks.0") => blockLines(b, ed, path).join("\n");
+
+  it("bullet points: delete per point and add point; Canvas output unchanged", () => {
+    const html = re({ type: "list", ordered: false, items: ["a", "b"] });
+    expect(html).toContain('<li><span data-edit="tabs.0.blocks.0.items.0">a</span> <button type="button" class="pc-del pc-inline-del" data-pc-action="delete" data-pc-path="tabs.0.blocks.0.items.0"');
+    expect(html).toContain('data-pc-action="add-item" data-pc-list="tabs.0.blocks.0.items" data-pc-index="2">+ Add point</button>');
+    expect(blockLines({ type: "list", ordered: false, items: ["a"] }, ctx, "tabs.0.blocks.0").join("\n")).toBe("<ul>\n    <li>a</li>\n</ul>");
+  });
+
+  it("callout bullet points get the same controls", () => {
+    const html = re({ type: "caution", title: "T", items: ["x"] });
+    expect(html).toContain('data-pc-path="tabs.0.blocks.0.items.0"');
+    expect(html).toContain('data-pc-list="tabs.0.blocks.0.items"');
+  });
+
+  it("table: delete per row and per column, add row and add column", () => {
+    const html = re({ type: "table", headers: ["A", "B"], rows: [["1", "2"], ["3", "4"]] });
+    expect(html).toContain('<tr class="pc-ctl-row">');
+    expect(html).toContain('data-pc-action="delete-column" data-pc-path="tabs.0.blocks.0" data-pc-index="0"');
+    expect(html).toContain('data-pc-action="delete-column" data-pc-path="tabs.0.blocks.0" data-pc-index="1"');
+    expect(html).toContain('data-pc-action="add-column" data-pc-path="tabs.0.blocks.0"');
+    expect(html).toContain('<td class="pc-ctl"><button type="button" class="pc-del pc-inline-del" data-pc-action="delete" data-pc-path="tabs.0.blocks.0.rows.1"');
+    expect(html).toContain('data-pc-action="add-item" data-pc-list="tabs.0.blocks.0.rows" data-pc-index="2">+ Add row</button>');
+    expect(blockLines({ type: "table", headers: ["A", "B"], rows: [["1", "2"]] }, ctx, "tabs.0.blocks.0").join("\n")).not.toContain("pc-");
+  });
+
+  it("a one-column table can't lose its last column", () => {
+    expect(re({ type: "table", headers: ["A"], rows: [["1"]] })).not.toContain("delete-column");
+  });
+
+  it("comparison table: rows only", () => {
+    const html = re({ type: "contrast_table", left_header: "L", right_header: "R", rows: [["a", "b"]] });
+    expect(html).toContain('data-pc-path="tabs.0.blocks.0.rows.0"');
+    expect(html).toContain('data-pc-list="tabs.0.blocks.0.rows" data-pc-index="1">+ Add row</button>');
+    expect(html).not.toContain("column");
+  });
+
+  it("check your understanding: delete and add questions", () => {
+    const html = re({ type: "self_check", questions: [{ question: "Q1?", answer: "A1." }, { question: "Q2?", answer: "A2." }] });
+    expect(html).toContain('data-pc-path="tabs.0.blocks.0.questions.1"');
+    expect(html).toContain('data-pc-list="tabs.0.blocks.0.questions" data-pc-index="2">+ Add question</button>');
+  });
+
+  it("flow: delete steps (only while more than two) and add a step", () => {
+    const three = re({ type: "flow", steps: [{ label: "a", style: "solid" }, { label: "b", style: "outline" }, { label: "c", style: "amber" }] });
+    expect(three).toContain('data-pc-path="tabs.0.blocks.0.steps.2"');
+    expect(three).toContain('data-pc-list="tabs.0.blocks.0.steps" data-pc-index="3">+ Add step</button>');
+    const two = re({ type: "flow", steps: [{ label: "a", style: "solid" }, { label: "b", style: "outline" }] });
+    expect(two).not.toContain('data-pc-path="tabs.0.blocks.0.steps.');
   });
 });

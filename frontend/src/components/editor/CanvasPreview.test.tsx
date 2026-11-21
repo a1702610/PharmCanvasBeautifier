@@ -336,3 +336,28 @@ describe("CanvasPreview: add/delete controls", () => {
     container.remove();
   });
 });
+
+describe("CanvasPreview: row, column and point controls", () => {
+  it("reports add-item, add-column and delete-column clicks", () => {
+    const html =
+      `<table><thead><tr class="pc-ctl-row"><th class="pc-ctl"><button type="button" data-pc-action="delete-column" data-pc-path="tabs.0.blocks.1" data-pc-index="1">x</button></th>` +
+      `<th class="pc-ctl"><button type="button" data-pc-action="add-column" data-pc-path="tabs.0.blocks.1">+</button></th></tr></thead></table>` +
+      `<div class="pc-add"><button type="button" data-pc-action="add-item" data-pc-list="tabs.0.blocks.1.rows" data-pc-index="2">+ Add row</button></div>`;
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const onAction = vi.fn();
+    act(() => {
+      root.render(<CanvasPreview html={html} activeIndex={0} editable onSelect={() => {}} onEdit={() => true} onAction={onAction} />);
+    });
+    const click = (sel: string) => act(() => (container.querySelector(sel) as HTMLElement).click());
+    click('[data-pc-action="add-item"]');
+    expect(onAction).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "add-item", list: "tabs.0.blocks.1.rows", index: 2 }));
+    click('[data-pc-action="add-column"]');
+    expect(onAction).toHaveBeenLastCalledWith({ kind: "add-column", path: "tabs.0.blocks.1" });
+    click('[data-pc-action="delete-column"]');
+    expect(onAction).toHaveBeenLastCalledWith({ kind: "delete-column", path: "tabs.0.blocks.1", index: 1 });
+    act(() => root.unmount());
+    container.remove();
+  });
+});

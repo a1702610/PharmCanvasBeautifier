@@ -34,8 +34,8 @@ In this prompt the block names map to components as follows: `table` = 4.4, `con
 Every page follows this skeleton, in this order:
 
 1. An **intro panel** (4.1): the page title, 2–3 short paragraphs saying what the page covers and why it matters, and an image placeholder (or an image from the source that orients the topic, such as a course map).
-2. A spacer, then the **tabs wrapper**: 3–8 teaching tabs, one per major concept, in teaching order, then a final "Study materials" tab. Teaching tab titles are 2–6 words, sentence case, and numbered "1.", "2.", … in order. The Study materials tab takes the next number.
-3. A spacer, then (when the source has revision material or the lecturer asks for it) a divider and the **Revision check** (4.12), then a final spacer.
+2. A spacer, then the **tabs wrapper**: 3–8 teaching tabs, one per major concept, in teaching order, then a "Study materials" tab, then (when there are revision points or the lecturer asks for it) a final **Revision check** tab (4.12). Teaching tab titles are 2–6 words, sentence case, and numbered "1.", "2.", … in order. Study materials and Revision check take the next numbers.
+3. A final spacer.
 
 Page skeleton:
 
@@ -46,10 +46,9 @@ Page skeleton:
     <div class="dp-panels-wrapper dp-tabs-buttons-vertical">
         TAB 1 … TAB N (teaching tabs)
         STUDY MATERIALS TAB
+        REVISION CHECK TAB (4.12)   ← only when revision points exist or the lecturer asks for it
     </div>
     <p>&nbsp;</p>
-    DIVIDER + REVISION CHECK (4.12)   ← only when revision points exist or the lecturer asks for it
-    <p>&nbsp;</p>                      ← only when the revision check is included
 </div>
 ```
 
@@ -132,7 +131,7 @@ Intro paragraphs use `margin: 0 0 12px 0;` except the last, which uses `margin: 
 <h4 style="color: #140f50;">TEXT</h4>
 ```
 
-Use `h4` only inside tabs and accordion panels. `h3` is only for tab titles and `h2` only for the intro title and "Revision check".
+Use `h4` only inside tabs and accordion panels. `h3` is only for tab titles and `h2` only for the intro title.
 
 ## 4.3 Paragraphs and lists
 
@@ -362,33 +361,33 @@ Skip decorative images. Never invent image URLs.
 
 This is the only place `&nbsp;` is used apart from between a number and its unit (e.g. `4&nbsp;g/day`).
 
-## 4.12 Divider and Revision check
+## 4.12 Revision check tab
+
+The last tab, titled "N. Revision check" (the next number after Study materials). Its `dp-panel-content`:
 
 ```html
-<hr style="border-width: 2px 0px 0px; border-style: solid none none; border-color: #ddd8ef; margin: 34px 0px 28px;" />
-<div style="padding: 24px 26px; background: #f4f2fb; border-top: 5px solid #140f50; border-radius: 10px;">
-    <h2 style="margin: 0 0 8px 0; color: #140f50;">Revision check</h2>
-    <p style="margin: 0 0 18px 0;">Before moving on, check that these ideas can be <strong>explained</strong>, rather than simply recalled.</p>
-    <table style="width: 100%; border-collapse: collapse; background: #ffffff;">
-        <tbody>
-            <tr>
-                <td style="width: 44px; padding: 12px; text-align: center; color: #d97706; border: 1px solid #cbd5e1;">1</td>
-                <td style="padding: 12px; border: 1px solid #cbd5e1;">POINT</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
+<p style="margin: 0 0 18px 0;">Before moving on, check that these ideas can be <strong>explained</strong>, rather than simply recalled.</p>
+<table style="width: 100%; border-collapse: collapse; background: #ffffff;">
+    <tbody>
+        <tr>
+            <td style="width: 44px; padding: 12px; text-align: center; color: #d97706; border: 1px solid #cbd5e1;">1</td>
+            <td style="padding: 12px; border: 1px solid #cbd5e1;">POINT</td>
+        </tr>
+    </tbody>
+</table>
+<p>&nbsp;</p>
 ```
 
 Add one row per point, numbered 1, 2, 3…
 
-Optional H5P slot (after the table), only when the source has a quiz or H5P embed or the lecturer asks for it. Keep an `<iframe>` embed from the source unchanged; otherwise leave the placeholder text:
+Optional H5P slot (after the table, followed by its own spacer), only when the source has a quiz or H5P embed or the lecturer asks for it. Keep an `<iframe>` embed from the source unchanged; otherwise leave the placeholder text:
 
 ```html
-<div style="margin: 20px 0px 0px; padding: 16px; background: #ffffff; border-radius: 8px; border: 2px dashed #ddd8ef; text-align: center;">
+<div style="padding: 16px; background: #ffffff; border-radius: 8px; border: 2px dashed #ddd8ef; text-align: center;">
     <p style="margin: 0 0 10px 0; color: #140f50;"><strong>Interactive questions</strong></p>
     <p style="margin: 0; color: #64748b;">[PASTE H5P EMBED HERE]</p>
 </div>
+<p>&nbsp;</p>
 ```
 
 # 5. Text formatting
@@ -403,7 +402,7 @@ These make the page easy to edit in Canvas.
 - Inside a tab's or accordion panel's `dp-panel-content`: insert one spacer (4.11) between two consecutive blocks when either is major; always end the content with exactly one spacer. Never put two spacers in a row.
 - Accordions therefore always have a spacer immediately before (unless they are the first block) and after.
 - Never insert spacers directly inside `dp-panels-wrapper` or between `dp-panel-group` siblings.
-- Top level: a spacer after the intro table, after the tabs wrapper, and after the Revision check (when included). The `<hr>` follows the post-tabs spacer.
+- Top level: a spacer after the intro table and after the tabs wrapper.
 - The Study materials tab follows the same rules (its parts are major).
 
 # 7. Technical rules
@@ -413,7 +412,7 @@ These make the page easy to edit in Canvas.
 - Remove all classes and attributes carried over from the source except those listed above and the image and iframe attributes in 4.10 and 4.12. This includes classes like `font-claude-response-body`, Word `Mso*` classes, and `dir="ltr"`.
 - Use HTML entities for special characters: `&amp;` `&mdash;` `&ndash;` `&rarr;` `&ne;` `&le;` `&ge;` `&micro;` `&times;` `&minus;`. Use `&nbsp;` only for spacers and between a number and its unit.
 - Never invent Canvas URLs, course IDs or `data-api-endpoint` values. Keep them only when they appear in the source image tags.
-- Every table goes inside a tab (or the intro panel and Revision check shown above). Never put other tables outside a tab.
+- Every table goes inside a tab (or the intro panel shown above). Never put other tables outside a tab.
 - Indent with 4 spaces so the lecturer can read and edit the code.
 
 # 8. Images

@@ -131,3 +131,39 @@
 }
 .canvas-preview .pc-add > button:hover { background: #f4f2fb; }
 .canvas-preview .dp-accordion-default > .pc-add { margin: 6px 0; }
+
+/* Inline × next to a point, row, question or step: faint until its row/item is hovered. */
+.canvas-preview .pc-inline-del {
+  position: static;
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  margin-left: 4px;
+  font-size: 13px;
+  vertical-align: middle;
+  opacity: 0.3;
+}
+.canvas-preview *:hover > .pc-inline-del,
+.canvas-preview tr:hover > .pc-ctl > .pc-inline-del,
+.canvas-preview .pc-inline-del:focus-visible { opacity: 1; }
+/* Control cells added to tables in edit mode (never in the copied HTML). */
+.canvas-preview .pc-ctl {
+  width: 28px;
+  padding: 2px 4px;
+  border: none !important;
+  background: #ffffff !important;
+  text-align: center;
+  vertical-align: middle;
+}
+.canvas-preview .pc-add-col {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px dashed #836bff;
+  background: #ffffff;
+  color: #140f50;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.canvas-preview .pc-add-col:hover { background: #f4f2fb; }

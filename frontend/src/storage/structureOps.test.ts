@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { InnerBlock, Page } from "../types/page";
 import { buildContext, renderPage } from "../render/renderPage";
-import { addTab, blockChoices, insertBlock, newBlock, newPanel, removeItem, removeTab } from "./structureOps";
+import { addColumn, addTab, blockChoices, insertBlock, newBlock, newListItem, newPanel, removeColumn, removeItem, removeTab } from "./structureOps";
 
 const p = (text: string): InnerBlock => ({ type: "paragraph", text });
 const page: Page = {
@@ -108,5 +108,67 @@ describe("addTab / removeTab", () => {
   it("removes a tab by index", () => {
     expect(removeTab(page, 0).tabs.map((t) => t.id)).toEqual(["t2"]);
     expect(page.tabs).toHaveLength(2);
+  });
+});
+
+describe("points, rows, columns, questions and steps", () => {
+  const rich: Page = {
+    ...page,
+    tabs: [
+      {
+        id: "t1",
+        title: "One",
+        blocks: [
+          { type: "list", ordered: false, items: ["a"] },
+          { type: "table", headers: ["A", "B"], col_widths: [30, 70], rows: [["1", "2"]] },
+          { type: "contrast_table", left_header: "L", right_header: "R", rows: [["x", "y"]] },
+          { type: "self_check", questions: [{ question: "Q?", answer: "A." }] },
+          { type: "flow", steps: [{ label: "s1", style: "solid" }, { label: "s2", style: "amber" }] },
+          { type: "table", headers: ["Time", "Conc"], row_headers: false, rows: [] },
+        ],
+      },
+    ],
+    revision: { include: false, points: ["p1"] },
+  };
+  const at = (p: Page, i: number) => p.tabs[0].blocks[i] as never as Record<string, unknown>;
+
+  it("builds the right new item for each kind of list", () => {
+    expect(newListItem(rich, "tabs.0.blocks.0.items")).toBe("New point");
+    expect(newListItem(rich, "revision.points")).toBe("New point");
+    expect(newListItem(rich, "tabs.0.blocks.1.rows")).toEqual(["Row label", "Cell"]);
+    expect(newListItem(rich, "tabs.0.blocks.5.rows")).toEqual(["Cell", "Cell"]);
+    expect(newListItem(rich, "tabs.0.blocks.2.rows")).toEqual(["Point about A", "Point about B"]);
+    expect(newListItem(rich, "tabs.0.blocks.3.questions")).toEqual({ question: "Question?", answer: "Answer." });
+    expect(newListItem(rich, "tabs.0.blocks.4.steps")).toEqual({ label: "New step", style: "outline" });
+    expect(() => newListItem(rich, "tabs.0.blocks")).toThrow();
+  });
+
+  it("adds and removes rows, points, questions and steps with insertBlock/removeItem", () => {
+    const withRow = insertBlock(rich, "tabs.0.blocks.1.rows", 1, newListItem(rich, "tabs.0.blocks.1.rows"));
+    expect(at(withRow, 1).rows).toEqual([["1", "2"], ["Row label", "Cell"]]);
+    expect(at(removeItem(withRow, "tabs.0.blocks.1.rows.0"), 1).rows).toEqual([["Row label", "Cell"]]);
+    expect(removeItem(rich, "revision.points.0").revision.points).toEqual([]);
+    expect(insertBlock(rich, "revision.points", 1, "New point").revision.points).toEqual(["p1", "New point"]);
+  });
+
+  it("can add points to a page whose revision check has none yet", () => {
+    const bare: Page = { ...rich, revision: { include: false } };
+    expect(insertBlock(bare, "revision.points", 0, "New point").revision.points).toEqual(["New point"]);
+  });
+
+  it("adds a column to the header and every row, dropping fixed widths", () => {
+    const next = addColumn(rich, "tabs.0.blocks.1");
+    expect(at(next, 1).headers).toEqual(["A", "B", "Heading"]);
+    expect(at(next, 1).rows).toEqual([["1", "2", "Cell"]]);
+    expect(at(next, 1).col_widths).toBeUndefined();
+  });
+
+  it("removes a column from the header and every row, but never the last one", () => {
+    const next = removeColumn(rich, "tabs.0.blocks.1", 0);
+    expect(at(next, 1).headers).toEqual(["B"]);
+    expect(at(next, 1).rows).toEqual([["2"]]);
+    expect(at(next, 1).col_widths).toBeUndefined();
+    expect(() => removeColumn(next, "tabs.0.blocks.1", 0)).toThrow();
+    expect(() => addColumn(rich, "tabs.0.blocks.0")).toThrow();
   });
 });

@@ -2,7 +2,7 @@ import type { EmbedInfo, ImageInfo } from "../types/api";
 import type { Page, Tab } from "../types/page";
 import { escapeAttr, renderInline } from "./inline";
 import { studyMaterialsContentLines } from "./studyMaterials";
-import { contentLines, figureLines, indent, PALETTE as P, PLACEHOLDER_STYLE, SPACER, type RenderContext } from "./templates";
+import { addSlot, contentLines, figureLines, indent, PALETTE as P, PLACEHOLDER_STYLE, rowDeleteCell, SPACER, type RenderContext } from "./templates";
 
 export const TABS_CLASS = "dp-panels-wrapper dp-tabs-buttons-vertical";
 
@@ -47,49 +47,55 @@ function tabLines(tab: Tab, ctx: RenderContext, i: number): string[] {
   return groupLines(`${i + 1}. ${title}`, contentLines(tab.blocks, ctx, `tabs.${i}.blocks`));
 }
 
-function revisionLines(page: Page, ctx: RenderContext): string[] {
+/** The Revision check, rendered as the last tab: the "explain, don't recall" prompt, the
+ *  numbered points and the optional H5P slot. */
+function revisionContentLines(page: Page, ctx: RenderContext): string[] {
   const rev = page.revision;
   const embed = rev.embed_ref ? ctx.embeds[rev.embed_ref] : undefined;
   const points = rev.points ?? [];
-  const inner: string[] = [
-    `<h2 style="margin: 0 0 8px 0; color: ${P.purple};">Revision check</h2>`,
+  const controls = ctx.editable === true;
+  const out: string[] = [
     `<p style="margin: 0 0 18px 0;">Before moving on, check that these ideas can be <strong>explained</strong>, rather than simply recalled.</p>`,
   ];
   if (points.length) {
-    inner.push(
+    out.push(
       '<table style="width: 100%; border-collapse: collapse; background: #ffffff;">',
       ...indent(["<tbody>", ...indent(points.flatMap((pt, i) => ["<tr>", ...indent([
         `<td style="width: 44px; padding: 12px; text-align: center; color: ${P.amber}; border: 1px solid ${P.border};">${i + 1}</td>`,
         `<td${edit(ctx, `revision.points.${i}`)} style="padding: 12px; border: 1px solid ${P.border};">${renderInline(pt)}</td>`,
+        ...(controls ? [rowDeleteCell(`revision.points.${i}`)] : []),
       ]), "</tr>"])), "</tbody>"]),
       "</table>",
     );
   }
+  if (controls) out.push(addSlot("add-item", "revision.points", points.length, "+ Add point"));
   if (rev.include || embed) {
-    inner.push(
-      `<div style="margin: 20px 0px 0px; padding: 16px; background: #ffffff; border-radius: 8px; border: 2px dashed ${P.lavenderBorder}; text-align: center;">`,
+    out.push(
+      SPACER,
+      `<div style="padding: 16px; background: #ffffff; border-radius: 8px; border: 2px dashed ${P.lavenderBorder}; text-align: center;">`,
       ...indent([`<p style="margin: 0 0 10px 0; color: ${P.purple};"><strong>Interactive questions</strong></p>`, `<p style="margin: 0; color: ${P.muted};">${embed ?? "[PASTE H5P EMBED HERE]"}</p>`]),
       "</div>",
     );
   }
-  return [
-    `<hr style="border-width: 2px 0px 0px; border-style: solid none none; border-color: ${P.lavenderBorder}; margin: 34px 0px 28px;" />`,
-    `<div style="padding: 24px 26px; background: ${P.lavender}; border-top: 5px solid ${P.purple}; border-radius: 10px;">`,
-    ...indent(inner),
-    "</div>",
-    SPACER,
-  ];
+  out.push(SPACER);
+  return out;
 }
 
 export function renderPage(page: Page, ctx: RenderContext): string {
+  // In edit mode the Revision check tab always shows, so a lecturer can add its first point.
+  const showRevision =
+    ctx.editable === true ||
+    (page.revision.points?.length ?? 0) > 0 ||
+    page.revision.include ||
+    !!(page.revision.embed_ref && ctx.embeds[page.revision.embed_ref]);
   const tabs = [
     ...page.tabs.flatMap((t, i) => tabLines(t, ctx, i)),
     ...groupLines(`${page.tabs.length + 1}. Study materials`, studyMaterialsContentLines(page, ctx)),
+    ...(showRevision ? groupLines(`${page.tabs.length + 2}. Revision check`, revisionContentLines(page, ctx)) : []),
   ];
-  const showRevision = (page.revision.points?.length ?? 0) > 0 || page.revision.include || !!(page.revision.embed_ref && ctx.embeds[page.revision.embed_ref]);
   const lines = [
     '<div id="dp-wrapper" class="dp-wrapper" style="color: #1f2937;">',
-    ...indent([...introLines(page, ctx), SPACER, `<div class="${TABS_CLASS}">`, ...indent(tabs), "</div>", SPACER, ...(showRevision ? revisionLines(page, ctx) : [])]),
+    ...indent([...introLines(page, ctx), SPACER, `<div class="${TABS_CLASS}">`, ...indent(tabs), "</div>", SPACER]),
     "</div>",
   ];
   return lines.join("\n") + "\n";

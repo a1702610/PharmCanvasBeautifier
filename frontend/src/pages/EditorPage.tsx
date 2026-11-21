@@ -13,7 +13,7 @@ import { buildContext, renderPage } from "../render/renderPage";
 import { getPage, savePage, type SavedPage } from "../storage/db";
 import { exportPageJson } from "../storage/exchange";
 import { replaceTab, undoTab, usedImageRefs } from "../storage/pageOps";
-import { addTab, insertBlock, newBlock, newPanel, removeItem, removeTab } from "../storage/structureOps";
+import { addColumn, addTab, insertBlock, newBlock, newListItem, newPanel, removeColumn, removeItem, removeTab } from "../storage/structureOps";
 import type { Block, Page, StudyMaterials } from "../types/page";
 import { buildImagesZip, downloadBlob, safeFilename } from "../utils/downloads";
 import { formatDate } from "../utils/format";
@@ -131,33 +131,48 @@ export default function EditorPage() {
     await persist({ ...base, page: { ...base.page, study: studyDraft } });
   }
 
-  // Structural change inside one tab (add/delete a section or panel). Goes through replaceTab
-  // so ↶ can undo it, like a text edit.
-  function changeTab(path: string, change: (page: Page) => Page) {
+  // Structural change (add/delete a section, panel, point, row, column…) at `path`. Changes
+  // inside a tab go through replaceTab so ↶ can undo them, like a text edit; the Revision
+  // check's points aren't part of a tab, so those are saved directly.
+  function changeStructure(path: string, change: (page: Page) => Page) {
     const base = savedRef.current ?? current;
-    const tabIndex = Number(path.match(/^tabs\.(\d+)\./)?.[1] ?? -1);
+    const tabMatch = path.match(/^tabs\.(\d+)\./);
+    const tabIndex = tabMatch ? Number(tabMatch[1]) : -1;
     const tab = base.page.tabs[tabIndex];
-    let nextPage: Page;
+    let next: SavedPage;
     try {
-      if (!tab) throw new Error(`No tab for ${path}`);
-      nextPage = change(base.page);
+      if (tabMatch && !tab) throw new Error(`No tab for ${path}`);
+      const nextPage = change(base.page);
+      next = tab ? replaceTab(base, tab.id, nextPage.tabs[tabIndex]) : { ...base, page: nextPage };
     } catch {
-      toast.error("Couldn't change that section.");
+      toast.error("Couldn't make that change.");
       return;
     }
-    persist(replaceTab(base, tab.id, nextPage.tabs[tabIndex])).catch(() => toast.error("Couldn't save that change."));
+    persist(next).catch(() => toast.error("Couldn't save that change."));
   }
 
   function handleAction(action: PreviewAction) {
-    if (action.kind === "delete") changeTab(action.path, (page) => removeItem(page, action.path));
-    else if (action.kind === "add") setAddMenu({ list: action.list, index: action.index, anchor: action.anchor });
-    else changeTab(action.list, (page) => insertBlock(page, action.list, action.index, newPanel()));
+    switch (action.kind) {
+      case "add":
+        setAddMenu({ list: action.list, index: action.index, anchor: action.anchor });
+        return;
+      case "add-panel":
+        return changeStructure(action.list, (page) => insertBlock(page, action.list, action.index, newPanel()));
+      case "add-item":
+        return changeStructure(action.list, (page) => insertBlock(page, action.list, action.index, newListItem(page, action.list)));
+      case "add-column":
+        return changeStructure(action.path, (page) => addColumn(page, action.path));
+      case "delete-column":
+        return changeStructure(action.path, (page) => removeColumn(page, action.path, action.index));
+      case "delete":
+        return changeStructure(action.path, (page) => removeItem(page, action.path));
+    }
   }
 
   function addSection(type: Block["type"]) {
     const target = addMenu;
     setAddMenu(null);
-    if (target) changeTab(target.list, (page) => insertBlock(page, target.list, target.index, newBlock(type)));
+    if (target) changeStructure(target.list, (page) => insertBlock(page, target.list, target.index, newBlock(type)));
   }
 
   function handleAddTab() {
@@ -259,7 +274,7 @@ export default function EditorPage() {
               Edit text
             </button>
             {editable && (
-              <span className="text-xs text-ink-muted">Click any text to change it. Use + Add and × to add or remove sections.</span>
+              <span className="text-xs text-ink-muted">Click any text to change it. Use + Add and × to add or remove sections, rows, columns and points.</span>
             )}
           </div>
           <div className="mt-4 rounded-2xl border border-line bg-white p-6 shadow-sm">
