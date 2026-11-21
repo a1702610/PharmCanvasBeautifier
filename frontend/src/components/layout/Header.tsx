@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { useApiKey } from "../../hooks/useApiKey";
 import { Button } from "../ui/Button";
 import { ApiKeyModal } from "./ApiKeyModal";
@@ -10,6 +10,7 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
 export function Header() {
   const [key] = useApiKey();
   const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3">
@@ -18,7 +19,7 @@ export function Header() {
           <span className="hidden text-sm text-ink-muted md:inline">Canvas pages for pharmacy, in one house style</span>
         </Link>
         <nav className="ml-auto flex items-center gap-1">
-          <NavLink to="/" end className={navClass}>Create</NavLink>
+          <NavLink to="/" className={() => navClass({ isActive: pathname === "/" || pathname.startsWith("/create") })}>Create</NavLink>
           <NavLink to="/pages" className={navClass}>My pages</NavLink>
         </nav>
         <Button variant={key ? "secondary" : "primary"} onClick={() => setOpen(true)}>

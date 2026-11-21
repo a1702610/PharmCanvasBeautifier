@@ -72,6 +72,10 @@ describe("renderPage", () => {
     expect(html).toContain("[PASTE H5P EMBED HERE]");
   });
 
+  it("in edit mode the page title is editable", () => {
+    expect(renderPage(page, buildContext([], [], true))).toContain('<h2 data-edit="title" style="margin: 0 0 14px 0; color: #140f50;">Chronic pain</h2>');
+  });
+
   it("in edit mode the Revision check tab is always shown so points can be added", () => {
     const html = renderPage({ ...page, revision: { include: false } }, buildContext([], [], true));
     expect(html).toContain("4. Revision check");

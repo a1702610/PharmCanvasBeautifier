@@ -5,12 +5,14 @@ Turns pharmacy lecture material (Word, PowerPoint, PDF, or an old Canvas page) i
 ## Using the hosted app
 
 1. Open the app link you were given.
-2. Click **Insert API Key** (top right) and paste a Gemini API key. Get one free at https://aistudio.google.com/apikey. The key stays in your browser.
-3. **Create:** drop in your files, or click **Paste Canvas page HTML** to bring in an old page. Reorder them with the arrows, then click **Generate page**. The first request of the day can take up to a minute while the server wakes up.
+2. On the home page choose how to start:
+   - **Use AI:** Gemini restructures your files into the template (steps 3–4). It can be hit or miss with transferring all your content, so always check the result against your originals.
+   - **Build it manually:** opens a blank page in the same template. Add sections yourself (step 5); no API key needed.
+3. **Create with AI:** click **Insert API Key** (top right) and paste a Gemini API key (get one free at https://aistudio.google.com/apikey; it stays in your browser). Drop in your files, or click **Paste Canvas page HTML** to bring in an old page. Reorder them with the arrows, then click **Generate page**. The first request of the day can take up to a minute while the server wakes up.
    - **Course:** pick a saved course so the AI pitches the page at the right level. Click **Manage courses** to add one: type the details, or use **Fill from course outline** to read a Word or PDF outline. Use export/import to move a course between computers or share it with a co-teacher.
    - **Study materials (optional):** open this section to add the handout, recording and transcript links, and any extra resources. You can also do this later with the **Study materials** button in the editor toolbar. Links you leave out show as `[Add … link]` placeholders on the page.
 4. **Review:** pages follow the shared pharmacy template: an intro panel, numbered tabs with collapsible sections, a "Study materials" tab, and a final "Revision check" tab. Click through the tabs in the preview. Read **Notes for you**: these are things to check, such as images to upload and content the AI flagged.
-5. **Adjust:** turn on **Edit text**, then click any text to change it. Use **+ Add** between sections to insert a new one (paragraph, table, callout, check your understanding…) and **×** to delete one. The same buttons add or remove bullet points, table rows and columns, questions, flow steps and revision points. Add or delete tabs in the tab list. Click ↶ next to a tab to undo its last change.
+5. **Edit:** click any text in the preview to change it, including the page title and tab names. Use **+ Add** between sections to insert a new one (paragraph, table, callout, check your understanding…) and **×** to delete one. The same buttons add or remove bullet points, table rows and columns, questions, flow steps and revision points. Add or delete tabs in the tab list. Click ↶ next to a tab to undo its last change.
 6. **Images:** click **Images ⤓** to download the images the page uses (`IMG-01.png`…). Upload them to Canvas and replace each dashed `[ IMAGE IMG-nn: … ]` placeholder.
 7. **Copy HTML**, then in Canvas: **Edit** → `</>` (HTML editor) → paste → **Save**.
 

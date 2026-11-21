@@ -28,7 +28,7 @@ function introLines(page: Page, ctx: RenderContext): string[] {
     `<table style="width: 100%; border-collapse: separate; margin: 0px 0px 28px; background: ${P.lavender}; border-radius: 12px; border: 1px solid ${P.lavenderBorder};" role="presentation">`,
     ...indent(["<tbody>", ...indent(["<tr>", ...indent([
       '<td style="width: 58%; vertical-align: middle; padding: 26px 30px;">',
-      ...indent([`<h2 style="margin: 0 0 14px 0; color: ${P.purple};">${renderInline(page.title)}</h2>`, ...paras]),
+      ...indent([`<h2${edit(ctx, "title")} style="margin: 0 0 14px 0; color: ${P.purple};">${renderInline(page.title)}</h2>`, ...paras]),
       "</td>",
       '<td style="width: 42%; vertical-align: middle; text-align: center; padding: 20px;">',
       ...indent(figure),

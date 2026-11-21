@@ -203,3 +203,15 @@ export function addTab(page: Page): Page {
 export function removeTab(page: Page, index: number): Page {
   return { ...page, tabs: page.tabs.filter((_, i) => i !== index) };
 }
+
+/** A blank page in the house style for building a page by hand: a title, one intro paragraph
+ *  and one tab to start from. Study materials and Revision check are added by the renderer. */
+export function blankPage(): Page {
+  return {
+    title: "Untitled page",
+    intro: ["Say what this page covers and why it matters. Click to edit."],
+    tabs: [{ id: "t1", title: "New tab", blocks: [{ type: "paragraph", text: PARAGRAPH }] }],
+    revision: { include: false },
+    notes: [],
+  };
+}

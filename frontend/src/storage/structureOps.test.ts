@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { InnerBlock, Page } from "../types/page";
 import { buildContext, renderPage } from "../render/renderPage";
-import { addColumn, addTab, blockChoices, insertBlock, newBlock, newListItem, newPanel, removeColumn, removeItem, removeTab } from "./structureOps";
+import { addColumn, addTab, blankPage, blockChoices, insertBlock, newBlock, newListItem, newPanel, removeColumn, removeItem, removeTab } from "./structureOps";
 
 const p = (text: string): InnerBlock => ({ type: "paragraph", text });
 const page: Page = {
@@ -170,5 +170,19 @@ describe("points, rows, columns, questions and steps", () => {
     expect(at(next, 1).col_widths).toBeUndefined();
     expect(() => removeColumn(next, "tabs.0.blocks.1", 0)).toThrow();
     expect(() => addColumn(rich, "tabs.0.blocks.0")).toThrow();
+  });
+});
+
+describe("blankPage", () => {
+  it("is a minimal page in the template: title, one intro paragraph, one tab, no revision", () => {
+    const blank = blankPage();
+    expect(blank.title).toBe("Untitled page");
+    expect(blank.intro).toHaveLength(1);
+    expect(blank.tabs).toHaveLength(1);
+    expect(blank.tabs[0].title).toBe("New tab");
+    expect(blank.tabs[0].blocks.length).toBeGreaterThan(0);
+    expect(blank.revision).toEqual({ include: false });
+    expect(blank.notes).toEqual([]);
+    expect(blankPage()).not.toBe(blank);
   });
 });

@@ -133,7 +133,7 @@ export default function CreatePage() {
 
   return (
     <div>
-      <h1 className="font-display text-5xl font-bold tracking-tight">Create a Canvas page</h1>
+      <h1 className="font-display text-5xl font-bold tracking-tight">Create with AI</h1>
       <p className="mt-2 max-w-2xl font-serif text-ink-muted">
         Add your lecture material, and PharmCanvas will restructure it into the pharmacy house style, ready to paste into Canvas.
       </p>

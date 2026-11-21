@@ -24,7 +24,6 @@ export default function EditorPage() {
   const { id } = useParams();
   const [saved, setSaved] = useState<SavedPage | null | undefined>(undefined);
   const [view, setView] = useState<"preview" | "html">("preview");
-  const [editable, setEditable] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [tipOpen, setTipOpen] = useState(false);
   const [studyOpen, setStudyOpen] = useState(false);
@@ -46,11 +45,11 @@ export default function EditorPage() {
     () => (saved ? renderPage(saved.page, buildContext(saved.images, saved.embeds)) : ""),
     [saved],
   );
-  // Preview-only render, used solely when the "Edit text" toggle is on. Copy HTML, Export
-  // and the HTML view always use the non-editable `html` above.
+  // The preview is always editable (data-edit paths and add/delete controls). Copy HTML,
+  // Export and the HTML view always use the clean `html` above.
   const previewHtml = useMemo(
-    () => (saved && editable ? renderPage(saved.page, buildContext(saved.images, saved.embeds, true)) : html),
-    [saved, editable, html],
+    () => (saved ? renderPage(saved.page, buildContext(saved.images, saved.embeds, true)) : ""),
+    [saved],
   );
   const downloadableRefs = useMemo(
     () => (saved ? usedImageRefs(saved.page).filter((ref) => saved.images.some((i) => i.ref === ref && i.data_b64)) : []),
@@ -180,7 +179,6 @@ export default function EditorPage() {
     persist({ ...base, page: addTab(base.page) }).catch(() => toast.error("Couldn't add the tab."));
     setActiveIndex(base.page.tabs.length);
     setView("preview");
-    setEditable(true);
   }
 
   function confirmDeleteTab() {
@@ -210,6 +208,8 @@ export default function EditorPage() {
       const tab = base.page.tabs[tabIndex];
       // Tab edits go through replaceTab so they get an undo-history entry; intro edits don't.
       next = tab ? replaceTab(base, tab.id, nextPage.tabs[tabIndex]) : { ...base, page: nextPage };
+      // The page title is also the saved page's name (My pages, the editor heading).
+      if (path === "title") next = { ...next, title: nextPage.title };
     } catch {
       toast.error("Couldn't save that edit.");
       return false;
@@ -265,24 +265,14 @@ export default function EditorPage() {
                 </button>
               ))}
             </div>
-            <button
-              type="button"
-              aria-pressed={editable}
-              onClick={() => setEditable((e) => !e)}
-              className={`rounded-full border border-line px-4 py-1.5 text-sm font-medium ${editable ? "bg-brightblue text-white" : "text-ink-muted hover:text-navy"}`}
-            >
-              Edit text
-            </button>
-            {editable && (
-              <span className="text-xs text-ink-muted">Click any text to change it. Use + Add and × to add or remove sections, rows, columns and points.</span>
-            )}
+            <span className="text-xs text-ink-muted">Click any text to change it. Use + Add and × to add or remove sections, rows, columns and points.</span>
           </div>
           <div className="mt-4 rounded-2xl border border-line bg-white p-6 shadow-sm">
             {view === "preview" ? (
               <CanvasPreview
                 html={previewHtml}
                 activeIndex={activeIndex}
-                editable={editable}
+                editable
                 onSelect={setActiveIndex}
                 onEdit={handleEdit}
                 onAction={handleAction}
