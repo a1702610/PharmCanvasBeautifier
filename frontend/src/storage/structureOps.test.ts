@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { InnerBlock, Page } from "../types/page";
 import { buildContext, renderPage } from "../render/renderPage";
-import { addColumn, addTab, blankPage, blockChoices, insertBlock, newBlock, newListItem, newPanel, removeColumn, removeItem, removeTab } from "./structureOps";
+import { addColumn, addTab, blankPage, blockChoices, insertBlock, newBlock, newListItem, newPanel, removeColumn, removeEmpty, removeItem, removeTab, splitText, toBulletList } from "./structureOps";
 
 const p = (text: string): InnerBlock => ({ type: "paragraph", text });
 const page: Page = {
@@ -184,5 +184,103 @@ describe("blankPage", () => {
     expect(blank.revision).toEqual({ include: false });
     expect(blank.notes).toEqual([]);
     expect(blankPage()).not.toBe(blank);
+  });
+});
+
+describe("typing: Enter splits, '- ' makes bullets, Backspace removes empties", () => {
+  const typing: Page = {
+    title: "T",
+    intro: ["Intro one"],
+    tabs: [
+      {
+        id: "t1",
+        title: "One",
+        blocks: [
+          { type: "paragraph", text: "Hello world" },
+          { type: "list", ordered: false, items: ["a", "b"] },
+          { type: "heading", text: "Heading" },
+          { type: "caution", title: "C", items: ["x"] },
+        ],
+      },
+    ],
+    revision: { include: false, points: ["p1"] },
+    notes: [],
+  };
+  const blocks = (p: Page) => p.tabs[0].blocks;
+
+  it("Enter in a paragraph splits it into two paragraphs and focuses the second", () => {
+    const { page: next, focus } = splitText(typing, "tabs.0.blocks.0.text", "Hello", "world");
+    expect(blocks(next).slice(0, 2)).toEqual([{ type: "paragraph", text: "Hello" }, { type: "paragraph", text: "world" }]);
+    expect(focus).toEqual({ path: "tabs.0.blocks.1.text", caret: "start" });
+  });
+
+  it("Enter in a heading starts a paragraph after it", () => {
+    const { page: next } = splitText(typing, "tabs.0.blocks.2.text", "Heading", "");
+    expect(blocks(next)[2]).toEqual({ type: "heading", text: "Heading" });
+    expect(blocks(next)[3]).toEqual({ type: "paragraph", text: "" });
+  });
+
+  it("Enter in the intro adds an intro paragraph", () => {
+    const { page: next, focus } = splitText(typing, "intro.0", "Intro", "one");
+    expect(next.intro).toEqual(["Intro", "one"]);
+    expect(focus).toEqual({ path: "intro.1", caret: "start" });
+  });
+
+  it("Enter in a bullet adds a bullet after it", () => {
+    const { page: next, focus } = splitText(typing, "tabs.0.blocks.1.items.0", "a", "");
+    expect(blocks(next)[1]).toEqual({ type: "list", ordered: false, items: ["a", "", "b"] });
+    expect(focus).toEqual({ path: "tabs.0.blocks.1.items.1", caret: "start" });
+    expect(splitText(typing, "revision.points.0", "p", "1").page.revision.points).toEqual(["p", "1"]);
+  });
+
+  it("Enter on an empty last bullet ends the list with a new paragraph", () => {
+    const withEmpty = splitText(typing, "tabs.0.blocks.1.items.1", "b", "").page;
+    const { page: next, focus } = splitText(withEmpty, "tabs.0.blocks.1.items.2", "", "");
+    expect(blocks(next)[1]).toEqual({ type: "list", ordered: false, items: ["a", "b"] });
+    expect(blocks(next)[2]).toEqual({ type: "paragraph", text: "" });
+    expect(focus).toEqual({ path: "tabs.0.blocks.2.text", caret: "start" });
+  });
+
+  it("Enter on an empty last point in a callout just removes it", () => {
+    const withEmpty = splitText(typing, "tabs.0.blocks.3.items.0", "x", "").page;
+    const { page: next, focus } = splitText(withEmpty, "tabs.0.blocks.3.items.1", "", "");
+    expect((blocks(next)[3] as { items: string[] }).items).toEqual(["x"]);
+    expect(focus).toBeUndefined();
+  });
+
+  it("'- ' at the start of a paragraph turns it into a bullet list", () => {
+    const { page: next, focus } = toBulletList(typing, "tabs.0.blocks.0.text", "Hello world");
+    expect(blocks(next)[0]).toEqual({ type: "list", ordered: false, items: ["Hello world"] });
+    expect(focus).toEqual({ path: "tabs.0.blocks.0.items.0", caret: "start" });
+  });
+
+  it("'- ' in a paragraph right after a bullet list adds to that list", () => {
+    const afterList: Page = { ...typing, tabs: [{ ...typing.tabs[0], blocks: [blocks(typing)[1], { type: "paragraph", text: "c" }] }] };
+    const { page: next, focus } = toBulletList(afterList, "tabs.0.blocks.1.text", "c");
+    expect(blocks(next)).toEqual([{ type: "list", ordered: false, items: ["a", "b", "c"] }]);
+    expect(focus).toEqual({ path: "tabs.0.blocks.0.items.2", caret: "start" });
+  });
+
+  it("Backspace on an empty bullet removes it and focuses the one before", () => {
+    const { page: next, focus } = removeEmpty(typing, "tabs.0.blocks.1.items.1");
+    expect(blocks(next)[1]).toEqual({ type: "list", ordered: false, items: ["a"] });
+    expect(focus).toEqual({ path: "tabs.0.blocks.1.items.0", caret: "end" });
+    const single = removeEmpty(next, "tabs.0.blocks.1.items.0");
+    expect(blocks(single.page).map((b) => b.type)).toEqual(["paragraph", "heading", "caution"]);
+  });
+
+  it("Backspace on an empty paragraph removes it and focuses the end of the text before", () => {
+    const withEmpty = splitText(typing, "tabs.0.blocks.0.text", "Hello world", "").page;
+    const { page: next, focus } = removeEmpty(withEmpty, "tabs.0.blocks.1.text");
+    expect(blocks(next)).toEqual(blocks(typing));
+    expect(focus).toEqual({ path: "tabs.0.blocks.0.text", caret: "end" });
+    const afterList = removeEmpty(splitText(typing, "tabs.0.blocks.2.text", "Heading", "").page, "tabs.0.blocks.3.text");
+    expect(afterList.focus).toEqual({ path: "tabs.0.blocks.2.text", caret: "end" });
+  });
+
+  it("Backspace on an empty intro paragraph removes it unless it's the only one", () => {
+    const two = splitText(typing, "intro.0", "Intro one", "").page;
+    expect(removeEmpty(two, "intro.1").page.intro).toEqual(["Intro one"]);
+    expect(removeEmpty(typing, "intro.0").page.intro).toEqual(["Intro one"]);
   });
 });

@@ -73,7 +73,7 @@ describe("renderPage", () => {
   });
 
   it("in edit mode the page title is editable", () => {
-    expect(renderPage(page, buildContext([], [], true))).toContain('<h2 data-edit="title" style="margin: 0 0 14px 0; color: #140f50;">Chronic pain</h2>');
+    expect(renderPage(page, buildContext([], [], true))).toContain('<h2 data-edit="title" data-enter="none" style="margin: 0 0 14px 0; color: #140f50;">Chronic pain</h2>');
   });
 
   it("in edit mode the Revision check tab is always shown so points can be added", () => {
@@ -84,14 +84,15 @@ describe("renderPage", () => {
 
   it("editable mode marks intro paragraphs and revision points, never spacers", () => {
     const html = renderPage(page, buildContext([], [], true));
-    expect(html).toContain('data-edit="intro.0"');
+    expect(html).toContain('data-edit="intro.0" data-enter="split"');
+    expect(html).toContain('data-edit="revision.points.1" data-enter="split"');
     expect(html).toContain('data-edit="revision.points.1"');
     expect(html).not.toMatch(/<p data-edit="[^"]*">&nbsp;<\/p>/);
   });
 
   it("editable mode makes teaching tab titles editable, but not the Study materials tab", () => {
     const html = renderPage(page, buildContext([], [], true));
-    expect(html).toContain('<h3 class="dp-panel-heading">1. <span data-edit="tabs.0.title">Overview</span></h3>');
+    expect(html).toContain('<h3 class="dp-panel-heading">1. <span data-edit="tabs.0.title" data-enter="none">Overview</span></h3>');
     expect(html).toContain('<h3 class="dp-panel-heading">3. Study materials</h3>');
     expect(renderPage(page, ctx)).toContain('<h3 class="dp-panel-heading">1. Overview</h3>');
   });

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useParams } from "react-router-dom";
 import { AddBlockMenu } from "../components/editor/AddBlockMenu";
-import { CanvasPreview, type PreviewAction } from "../components/editor/CanvasPreview";
+import { CanvasPreview, type FocusRequest, type PreviewAction } from "../components/editor/CanvasPreview";
 import { NotesPanel } from "../components/editor/NotesPanel";
 import { StudyMaterialsForm, emptyStudy } from "../components/study/StudyMaterialsForm";
 import { TabRail } from "../components/editor/TabRail";
@@ -13,7 +13,20 @@ import { buildContext, renderPage } from "../render/renderPage";
 import { getPage, savePage, type SavedPage } from "../storage/db";
 import { exportPageJson } from "../storage/exchange";
 import { replaceTab, undoTab, usedImageRefs } from "../storage/pageOps";
-import { addColumn, addTab, insertBlock, newBlock, newListItem, newPanel, removeColumn, removeItem, removeTab } from "../storage/structureOps";
+import {
+  addColumn,
+  addTab,
+  insertBlock,
+  newBlock,
+  newListItem,
+  newPanel,
+  removeColumn,
+  removeEmpty,
+  removeItem,
+  removeTab,
+  splitText,
+  toBulletList,
+} from "../storage/structureOps";
 import type { Block, Page, StudyMaterials } from "../types/page";
 import { buildImagesZip, downloadBlob, safeFilename } from "../utils/downloads";
 import { formatDate } from "../utils/format";
@@ -30,6 +43,8 @@ export default function EditorPage() {
   const [studyDraft, setStudyDraft] = useState<StudyMaterials>(emptyStudy());
   const [addMenu, setAddMenu] = useState<{ list: string; index: number; anchor: DOMRect } | null>(null);
   const [tabToDelete, setTabToDelete] = useState<number | null>(null);
+  const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
+  const focusRequestId = useRef(0);
 
   // Mirrors `saved`, but written synchronously (not via a render/effect) wherever we change
   // it, so a handler that fires right after another one just saved (e.g. Copy/Undo clicked in
@@ -165,7 +180,25 @@ export default function EditorPage() {
         return changeStructure(action.path, (page) => removeColumn(page, action.path, action.index));
       case "delete":
         return changeStructure(action.path, (page) => removeItem(page, action.path));
+      case "split":
+        return typingChange(action.path, (page) => splitText(page, action.path, action.before, action.after));
+      case "to-list":
+        return typingChange(action.path, (page) => toBulletList(page, action.path, action.text));
+      case "remove-empty":
+        return typingChange(action.path, (page) => removeEmpty(page, action.path));
     }
+  }
+
+  // Enter / "- " / Backspace while typing: a structural change, then the caret moves to the
+  // field the change says (e.g. the new paragraph).
+  function typingChange(path: string, change: (page: Page) => { page: Page; focus?: { path: string; caret: "start" | "end" } }) {
+    let focus: { path: string; caret: "start" | "end" } | undefined;
+    changeStructure(path, (page) => {
+      const result = change(page);
+      focus = result.focus;
+      return result.page;
+    });
+    if (focus) setFocusRequest({ ...focus, id: ++focusRequestId.current });
   }
 
   function addSection(type: Block["type"]) {
@@ -265,7 +298,7 @@ export default function EditorPage() {
                 </button>
               ))}
             </div>
-            <span className="text-xs text-ink-muted">Click any text to change it. Use + Add and × to add or remove sections, rows, columns and points.</span>
+            <span className="text-xs text-ink-muted">Click any text to change it. Enter starts a new paragraph or point; type "- " for a bullet list. Use + Add and × to add or remove sections, rows, columns and points.</span>
           </div>
           <div className="mt-4 rounded-2xl border border-line bg-white p-6 shadow-sm">
             {view === "preview" ? (
@@ -276,6 +309,7 @@ export default function EditorPage() {
                 onSelect={setActiveIndex}
                 onEdit={handleEdit}
                 onAction={handleAction}
+                focusRequest={focusRequest}
               />
             ) : (
               <pre className="max-h-[70vh] overflow-auto rounded-xl bg-limestone-soft p-5 font-mono text-xs leading-relaxed text-navy">

@@ -258,7 +258,7 @@ describe("remaining components", () => {
     expect(kp).toContain('<span data-edit="p.lead">L.</span>');
     expect(kp).toContain('<span data-edit="p.text">T</span>');
     const acc = re({ type: "accordion", panels: [{ title: "P", blocks: [{ type: "paragraph", text: "a" }, { type: "paragraph", text: "b" }] }] }, "p");
-    expect(acc).toContain('<p data-edit="p.panels.0.blocks.1.text">b</p>');
+    expect(acc).toContain('<p data-edit="p.panels.0.blocks.1.text" data-enter="split" data-autolist="1">b</p>');
   });
 });
 
@@ -316,7 +316,7 @@ describe("fix round 1 additions", () => {
     const c = re({ type: "caution", title: "T", body: "B", items: ["i"] }, "p");
     expect(c).toContain('<strong data-edit="p.title">T</strong>');
     expect(c).toContain('<span data-edit="p.body">B</span>');
-    expect(c).toContain('<li><span data-edit="p.items.0">i</span>');
+    expect(c).toContain('<li><span data-edit="p.items.0" data-enter="split">i</span>');
     expect(re({ type: "counselling", items: ["i"] }, "p")).not.toMatch(/data-edit="p\.title"/);
     expect(re({ type: "counselling", title: "Custom", items: ["i"] }, "p")).toContain('<strong data-edit="p.title" style="color: #140f50;">Custom</strong>');
     expect(re({ type: "figure", ref: "IMG-02", alt: "A", caption: "Cap" }, "p")).toContain('data-edit="p.caption"');
@@ -340,7 +340,7 @@ describe("editor add/delete controls", () => {
     expect(html).toContain('<div class="pc-block">');
     expect(html).toContain('data-pc-action="delete" data-pc-path="tabs.0.blocks.0"');
     expect(html).toContain('data-pc-action="delete" data-pc-path="tabs.0.blocks.1"');
-    expect(html).toContain('<p data-edit="tabs.0.blocks.0.text">a</p>');
+    expect(html).toContain('<p data-edit="tabs.0.blocks.0.text" data-enter="split" data-autolist="1">a</p>');
   });
 
   it("an empty list still gets one add slot", () => {
@@ -355,7 +355,7 @@ describe("editor add/delete controls", () => {
   it("accordion: editable panel titles, delete-panel buttons, add-panel slot and inner add slots", () => {
     const acc: Block = { type: "accordion", panels: [{ title: "Worked example", blocks: [para("x")] }, { title: "Case", blocks: [] }] };
     const html = blockLines(acc, ed, "tabs.0.blocks.2").join("\n");
-    expect(html).toContain('<span data-edit="tabs.0.blocks.2.panels.0.title">Worked example</span>');
+    expect(html).toContain('<span data-edit="tabs.0.blocks.2.panels.0.title" data-enter="none">Worked example</span>');
     expect(html).toContain('data-pc-action="delete" data-pc-path="tabs.0.blocks.2.panels.1"');
     expect(html).toContain('data-pc-action="add-panel" data-pc-list="tabs.0.blocks.2.panels" data-pc-index="2"');
     expect(html).toContain('data-pc-list="tabs.0.blocks.2.panels.1.blocks" data-pc-index="0"');
@@ -374,7 +374,7 @@ describe("editor controls inside sections", () => {
 
   it("bullet points: delete per point and add point; Canvas output unchanged", () => {
     const html = re({ type: "list", ordered: false, items: ["a", "b"] });
-    expect(html).toContain('<li><span data-edit="tabs.0.blocks.0.items.0">a</span> <button type="button" class="pc-del pc-inline-del" data-pc-action="delete" data-pc-path="tabs.0.blocks.0.items.0"');
+    expect(html).toContain('<li><span data-edit="tabs.0.blocks.0.items.0" data-enter="split">a</span> <button type="button" class="pc-del pc-inline-del" data-pc-action="delete" data-pc-path="tabs.0.blocks.0.items.0"');
     expect(html).toContain('data-pc-action="add-item" data-pc-list="tabs.0.blocks.0.items" data-pc-index="2">+ Add point</button>');
     expect(blockLines({ type: "list", ordered: false, items: ["a"] }, ctx, "tabs.0.blocks.0").join("\n")).toBe("<ul>\n    <li>a</li>\n</ul>");
   });
@@ -419,5 +419,14 @@ describe("editor controls inside sections", () => {
     expect(three).toContain('data-pc-list="tabs.0.blocks.0.steps" data-pc-index="3">+ Add step</button>');
     const two = re({ type: "flow", steps: [{ label: "a", style: "solid" }, { label: "b", style: "outline" }] });
     expect(two).not.toContain('data-pc-path="tabs.0.blocks.0.steps.');
+  });
+});
+
+describe("Enter-key markers (edit mode only)", () => {
+  const ed: RenderContext = { ...ctx, editable: true };
+  it("paragraphs split and auto-bullet, headings split, other text gets no marker", () => {
+    expect(blockLines({ type: "heading", text: "H" }, ed, "tabs.0.blocks.0").join("")).toBe('<h4 data-edit="tabs.0.blocks.0.text" data-enter="split" style="color: #140f50;">H</h4>');
+    expect(blockLines({ type: "clinical", body: "B" }, ed, "tabs.0.blocks.0").join("")).not.toContain("data-enter");
+    expect(blockLines({ type: "paragraph", text: "P" }, ctx, "tabs.0.blocks.0").join("")).toBe("<p>P</p>");
   });
 });

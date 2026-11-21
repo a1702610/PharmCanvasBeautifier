@@ -40,7 +40,8 @@ export function renderInline(src: string): string {
   return html
     .split(/(<[^>]+>)/)
     .map((seg) => (seg.startsWith("<") ? seg : seg.replace(SUB_RE, "<sub>$1</sub>").replace(SUP_RE, "<sup>$1</sup>")))
-    .join("");
+    .join("")
+    .replace(/\n/g, "<br />");
 }
 
 export function splitParagraphs(s: string): string[] {

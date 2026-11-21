@@ -2,7 +2,7 @@ import type { EmbedInfo, ImageInfo } from "../types/api";
 import type { Page, Tab } from "../types/page";
 import { escapeAttr, renderInline } from "./inline";
 import { studyMaterialsContentLines } from "./studyMaterials";
-import { addSlot, contentLines, figureLines, indent, PALETTE as P, PLACEHOLDER_STYLE, rowDeleteCell, SPACER, type RenderContext } from "./templates";
+import { addSlot, contentLines, enterAttr, figureLines, indent, type EnterBehaviour, PALETTE as P, PLACEHOLDER_STYLE, rowDeleteCell, SPACER, type RenderContext } from "./templates";
 
 export const TABS_CLASS = "dp-panels-wrapper dp-tabs-buttons-vertical";
 
@@ -14,12 +14,13 @@ export function buildContext(images: ImageInfo[], embeds: EmbedInfo[], editable 
   return { images: imageMap, embeds: embedMap, editable };
 }
 
-const edit = (ctx: RenderContext, path: string) => (ctx.editable ? ` data-edit="${escapeAttr(path)}"` : "");
+const edit = (ctx: RenderContext, path: string, enter?: EnterBehaviour) =>
+  ctx.editable ? ` data-edit="${escapeAttr(path)}"${enterAttr(enter)}` : "";
 
 function introLines(page: Page, ctx: RenderContext): string[] {
   const paras = page.intro.map((p, i) => {
     const margin = i === page.intro.length - 1 ? "margin: 0;" : "margin: 0 0 12px 0;";
-    return `<p${edit(ctx, `intro.${i}`)} style="${margin}">${renderInline(p)}</p>`;
+    return `<p${edit(ctx, `intro.${i}`, "split")} style="${margin}">${renderInline(p)}</p>`;
   });
   const figure = page.intro_figure
     ? figureLines(page.intro_figure, ctx, "intro_figure")
@@ -28,7 +29,7 @@ function introLines(page: Page, ctx: RenderContext): string[] {
     `<table style="width: 100%; border-collapse: separate; margin: 0px 0px 28px; background: ${P.lavender}; border-radius: 12px; border: 1px solid ${P.lavenderBorder};" role="presentation">`,
     ...indent(["<tbody>", ...indent(["<tr>", ...indent([
       '<td style="width: 58%; vertical-align: middle; padding: 26px 30px;">',
-      ...indent([`<h2${edit(ctx, "title")} style="margin: 0 0 14px 0; color: ${P.purple};">${renderInline(page.title)}</h2>`, ...paras]),
+      ...indent([`<h2${edit(ctx, "title", "none")} style="margin: 0 0 14px 0; color: ${P.purple};">${renderInline(page.title)}</h2>`, ...paras]),
       "</td>",
       '<td style="width: 42%; vertical-align: middle; text-align: center; padding: 20px;">',
       ...indent(figure),
@@ -43,7 +44,7 @@ function groupLines(title: string, content: string[]): string[] {
 }
 
 function tabLines(tab: Tab, ctx: RenderContext, i: number): string[] {
-  const title = ctx.editable ? `<span data-edit="tabs.${i}.title">${renderInline(tab.title)}</span>` : renderInline(tab.title);
+  const title = ctx.editable ? `<span data-edit="tabs.${i}.title"${enterAttr("none")}>${renderInline(tab.title)}</span>` : renderInline(tab.title);
   return groupLines(`${i + 1}. ${title}`, contentLines(tab.blocks, ctx, `tabs.${i}.blocks`));
 }
 
@@ -62,7 +63,7 @@ function revisionContentLines(page: Page, ctx: RenderContext): string[] {
       '<table style="width: 100%; border-collapse: collapse; background: #ffffff;">',
       ...indent(["<tbody>", ...indent(points.flatMap((pt, i) => ["<tr>", ...indent([
         `<td style="width: 44px; padding: 12px; text-align: center; color: ${P.amber}; border: 1px solid ${P.border};">${i + 1}</td>`,
-        `<td${edit(ctx, `revision.points.${i}`)} style="padding: 12px; border: 1px solid ${P.border};">${renderInline(pt)}</td>`,
+        `<td${edit(ctx, `revision.points.${i}`, "split")} style="padding: 12px; border: 1px solid ${P.border};">${renderInline(pt)}</td>`,
         ...(controls ? [rowDeleteCell(`revision.points.${i}`)] : []),
       ]), "</tr>"])), "</tbody>"]),
       "</table>",

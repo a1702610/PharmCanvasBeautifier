@@ -12,10 +12,16 @@ function normalizeNbsp(s: string): string {
   });
 }
 
+/** Stands in for a <br> while whitespace is collapsed; becomes "\n" afterwards. */
+const LINE_BREAK = "\u0001";
+
 function collapseWhitespace(s: string): string {
   return normalizeNbsp(s)
     .replace(/[ \t\n\r]+/g, " ")
-    .trim();
+    .replace(new RegExp(` *${LINE_BREAK}[ ${LINE_BREAK}]*`, "g"), LINE_BREAK)
+    .replace(new RegExp(`^${LINE_BREAK}|${LINE_BREAK}$`, "g"), "")
+    .trim()
+    .replace(new RegExp(LINE_BREAK, "g"), "\n");
 }
 
 function childrenInline(el: Element): string {
@@ -39,7 +45,7 @@ function inlineToMarkdown(node: Node): string {
   const el = node as Element;
   switch (el.tagName) {
     case "BR":
-      return " ";
+      return LINE_BREAK;
     case "STRONG":
     case "B":
       return wrapMarker("**", childrenInline(el));
@@ -66,7 +72,7 @@ function inlineToMarkdown(node: Node): string {
  * used by renderInline (**bold**, *italic*, [text](https://url)), per the "Inline text
  * editing" section of callouts-spec.md:
  *   - <strong>/<b> -> **...**, <em>/<i> -> *...*, <a href="https://..."> -> [text](url)
- *   - <br> -> a single space
+ *   - <br> -> a line break ("\n"); several in a row count as one, leading/trailing ones are dropped
  *   - top-level content is split into paragraphs at each <p>/<div> child (a multi-paragraph
  *     table cell, or lines a browser wrapped in <div>s on Enter/paste), joined by "\n\n";
  *     runs of plain inline content between/around those block children form their own

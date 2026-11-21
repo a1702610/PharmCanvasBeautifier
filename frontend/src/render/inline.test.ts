@@ -64,3 +64,9 @@ describe("subscript and superscript placement", () => {
     expect(renderInline("**C~max~**")).toBe("<strong>C<sub>max</sub></strong>");
   });
 });
+
+describe("line breaks", () => {
+  it("renders a single newline as <br />", () => {
+    expect(renderInline("Line one\nLine two")).toBe("Line one<br />Line two");
+  });
+});

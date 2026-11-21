@@ -361,3 +361,133 @@ describe("CanvasPreview: row, column and point controls", () => {
     container.remove();
   });
 });
+
+describe("CanvasPreview: Enter, '- ' and Backspace while typing", () => {
+  const html =
+    `<p data-edit="tabs.0.blocks.0.text" data-enter="split" data-autolist="1" tabindex="0">Hello <strong>big</strong> world</p>` +
+    `<h2 data-edit="title" data-enter="none" tabindex="0">Title</h2>` +
+    `<div><p data-edit="tabs.0.blocks.1.body" tabindex="0">Callout</p></div>` +
+    `<ul><li><span data-edit="tabs.0.blocks.2.items.0" data-enter="split" tabindex="0"></span></li></ul>`;
+
+  function mount(onAction = vi.fn(), onEdit = vi.fn(() => true), focusRequest?: { path: string; caret: "start" | "end"; id: number }) {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const render = (fr?: typeof focusRequest) =>
+      act(() => {
+        root.render(<CanvasPreview html={html} activeIndex={0} editable onSelect={() => {}} onEdit={onEdit} onAction={onAction} focusRequest={fr} />);
+      });
+    render(focusRequest);
+    return {
+      container,
+      onAction,
+      onEdit,
+      render,
+      done: () => {
+        act(() => root.unmount());
+        container.remove();
+      },
+    };
+  }
+
+  function caretAt(node: Node, offset: number) {
+    const range = document.createRange();
+    range.setStart(node, offset);
+    range.collapse(true);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  const key = (el: HTMLElement, k: string, init: KeyboardEventInit = {}) => {
+    const event = new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...init });
+    act(() => {
+      el.dispatchEvent(event);
+    });
+    return event;
+  };
+
+  it("Enter in a paragraph reports a split at the caret, keeping formatting on each side", () => {
+    const { container, onAction, onEdit, done } = mount();
+    const p = container.querySelector<HTMLElement>('[data-edit="tabs.0.blocks.0.text"]')!;
+    act(() => p.focus());
+    caretAt(p.querySelector("strong")!.firstChild!, 1); // "Hello b|ig world"
+    const event = key(p, "Enter");
+    expect(event.defaultPrevented).toBe(true);
+    expect(onAction).toHaveBeenCalledWith({ kind: "split", path: "tabs.0.blocks.0.text", before: "Hello **b**", after: "**ig** world" });
+    act(() => p.blur());
+    expect(onEdit).not.toHaveBeenCalled();
+    done();
+  });
+
+  it("Enter in a title does nothing", () => {
+    const { container, onAction, done } = mount();
+    const h2 = container.querySelector<HTMLElement>('[data-edit="title"]')!;
+    act(() => h2.focus());
+    caretAt(h2.firstChild!, 2);
+    expect(key(h2, "Enter").defaultPrevented).toBe(true);
+    expect(onAction).not.toHaveBeenCalled();
+    expect(h2.innerHTML).toBe("Title");
+    done();
+  });
+
+  it("Enter in other text inserts a line break in the same box", () => {
+    const { container, onAction, done } = mount();
+    const body = container.querySelector<HTMLElement>('[data-edit="tabs.0.blocks.1.body"]')!;
+    act(() => body.focus());
+    caretAt(body.firstChild!, 3);
+    key(body, "Enter");
+    expect(onAction).not.toHaveBeenCalled();
+    expect(body.innerHTML).toBe("Cal<br>lout");
+    done();
+  });
+
+  it("Shift+Enter in a paragraph is a line break, not a split", () => {
+    const { container, onAction, done } = mount();
+    const p = container.querySelector<HTMLElement>('[data-edit="tabs.0.blocks.0.text"]')!;
+    act(() => p.focus());
+    caretAt(p.firstChild!, 5);
+    key(p, "Enter", { shiftKey: true });
+    expect(onAction).not.toHaveBeenCalled();
+    expect(p.innerHTML).toContain("<br>");
+    done();
+  });
+
+  it("typing '- ' at the start of a paragraph asks for a bullet list", () => {
+    const { container, onAction, done } = mount();
+    const p = container.querySelector<HTMLElement>('[data-edit="tabs.0.blocks.0.text"]')!;
+    act(() => p.focus());
+    p.innerHTML = "- Hello";
+    act(() => {
+      p.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(onAction).toHaveBeenCalledWith({ kind: "to-list", path: "tabs.0.blocks.0.text", text: "Hello" });
+    done();
+  });
+
+  it("Backspace in an empty bullet asks to remove it", () => {
+    const { container, onAction, done } = mount();
+    const li = container.querySelector<HTMLElement>('[data-edit="tabs.0.blocks.2.items.0"]')!;
+    act(() => li.focus());
+    expect(key(li, "Backspace").defaultPrevented).toBe(true);
+    expect(onAction).toHaveBeenCalledWith({ kind: "remove-empty", path: "tabs.0.blocks.2.items.0" });
+    done();
+  });
+
+  it("Backspace in a field with text behaves normally", () => {
+    const { container, onAction, done } = mount();
+    const p = container.querySelector<HTMLElement>('[data-edit="tabs.0.blocks.0.text"]')!;
+    act(() => p.focus());
+    expect(key(p, "Backspace").defaultPrevented).toBe(false);
+    expect(onAction).not.toHaveBeenCalled();
+    done();
+  });
+
+  it("focusRequest puts the caret in the requested field", () => {
+    const { container, render, done } = mount();
+    render({ path: "tabs.0.blocks.1.body", caret: "end", id: 1 });
+    const body = container.querySelector<HTMLElement>('[data-edit="tabs.0.blocks.1.body"]')!;
+    expect(document.activeElement).toBe(body);
+    done();
+  });
+});

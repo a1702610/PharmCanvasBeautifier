@@ -41,8 +41,18 @@ export function indent(lines: string[], level = 1): string[] {
   return lines.map((line) => pad + line);
 }
 
-function editAttr(ctx: RenderContext, path: string | undefined): string {
-  return ctx.editable && path ? ` data-edit="${escapeAttr(path)}"` : "";
+/** What Enter does in an editable field (read by CanvasPreview's key handler):
+ *  "split" starts a new paragraph/bullet/point after it, "autolist" also turns a leading "- "
+ *  into a bullet, "none" does nothing (titles); unmarked fields get a line break. */
+export type EnterBehaviour = "split" | "autolist" | "none";
+
+export function enterAttr(enter: EnterBehaviour | undefined): string {
+  if (enter === "autolist") return ' data-enter="split" data-autolist="1"';
+  return enter ? ` data-enter="${enter}"` : "";
+}
+
+function editAttr(ctx: RenderContext, path: string | undefined, enter?: EnterBehaviour): string {
+  return ctx.editable && path ? ` data-edit="${escapeAttr(path)}"${enterAttr(enter)}` : "";
 }
 
 function editSpan(ctx: RenderContext, path: string | undefined, inner: string): string {
@@ -135,7 +145,7 @@ function listLines(items: string[], ordered: boolean, ctx: RenderContext, itemsP
   // Edit mode: the text goes in its own editable span so the x beside it isn't part of the text.
   const lis = items.map((i, idx) => {
     const itemPath = `${itemsPath}.${idx}`;
-    return `<li><span data-edit="${escapeAttr(itemPath)}">${renderInline(i)}</span> ${deleteButton(itemPath, "Delete this point", true)}</li>`;
+    return `<li><span data-edit="${escapeAttr(itemPath)}"${enterAttr("split")}>${renderInline(i)}</span> ${deleteButton(itemPath, "Delete this point", true)}</li>`;
   });
   return [open, ...indent(lis), `</${tag}>`, addSlot("add-item", itemsPath, items.length, "+ Add point")];
 }
@@ -252,9 +262,9 @@ export function rowDeleteCell(path: string): string {
 export function blockLines(block: Block, ctx: RenderContext, path?: string): string[] {
   switch (block.type) {
     case "heading":
-      return [`<h4${editAttr(ctx, join(path, "text"))} style="color: ${P.purple};">${renderInline(block.text)}</h4>`];
+      return [`<h4${editAttr(ctx, join(path, "text"), "split")} style="color: ${P.purple};">${renderInline(block.text)}</h4>`];
     case "paragraph":
-      return [`<p${editAttr(ctx, join(path, "text"))}>${renderInline(block.text)}</p>`];
+      return [`<p${editAttr(ctx, join(path, "text"), "autolist")}>${renderInline(block.text)}</p>`];
     case "list":
       return listLines(block.items, block.ordered, ctx, join(path, "items"));
     case "table": {
@@ -394,7 +404,7 @@ export function blockLines(block: Block, ctx: RenderContext, path?: string): str
             const panelPath = join(join(path, "panels"), i);
             const title = renderInline(panel.title);
             const heading = controls
-              ? `<h4 class="dp-panel-heading"><span data-edit="${escapeAttr(`${panelPath}.title`)}">${title}</span>${deleteButton(panelPath!, "Delete this panel")}</h4>`
+              ? `<h4 class="dp-panel-heading"><span data-edit="${escapeAttr(`${panelPath}.title`)}"${enterAttr("none")}>${title}</span>${deleteButton(panelPath!, "Delete this panel")}</h4>`
               : `<h4 class="dp-panel-heading">${title}</h4>`;
             return [
               '<div class="dp-panel-group">',

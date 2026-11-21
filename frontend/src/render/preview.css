@@ -167,3 +167,6 @@
   cursor: pointer;
 }
 .canvas-preview .pc-add-col:hover { background: #f4f2fb; }
+
+/* An empty editable field (e.g. the new paragraph after Enter) still needs a line to click into. */
+.canvas-preview.is-editing [data-edit]:empty::before { content: "\200b"; }

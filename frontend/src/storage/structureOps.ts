@@ -215,3 +215,115 @@ export function blankPage(): Page {
     notes: [],
   };
 }
+
+/** Where to put the caret after a typing change re-renders the page. */
+export interface Focus {
+  path: string;
+  caret: "start" | "end";
+}
+
+const BLOCK_TEXT_RE = /^(.*\.blocks)\.(\d+)\.text$/;
+const ITEM_RE = /^(.*)\.(\d+)$/;
+
+function setAt(page: Page, path: string, value: unknown): Page {
+  return updateAt(page, path.split("."), () => value) as Page;
+}
+
+/** Where the caret goes to continue typing at the end of `block` (at `blockPath`), if it has text. */
+function endOf(block: Block | undefined, blockPath: string): Focus | undefined {
+  if (block?.type === "paragraph" || block?.type === "heading") return { path: `${blockPath}.text`, caret: "end" };
+  if (block?.type === "list" && block.items.length) return { path: `${blockPath}.items.${block.items.length - 1}`, caret: "end" };
+  return undefined;
+}
+
+/** Enter in an editable field at `path`, with the text before and after the caret:
+ *  - the intro or a paragraph/heading: the text after the caret moves into a new paragraph below;
+ *  - a bullet or revision point: the text after the caret becomes a new item below;
+ *  - an empty last bullet: it's removed, and a list block is followed by a new paragraph. */
+export function splitText(page: Page, path: string, before: string, after: string): { page: Page; focus?: Focus } {
+  const intro = path.match(/^intro\.(\d+)$/);
+  if (intro) {
+    const i = Number(intro[1]);
+    const next = insertBlock(setAt(page, path, before), "intro", i + 1, after);
+    return { page: next, focus: { path: `intro.${i + 1}`, caret: "start" } };
+  }
+
+  const blockText = path.match(BLOCK_TEXT_RE);
+  if (blockText) {
+    const [, list, index] = blockText;
+    const block = getAt(page, `${list}.${index}`) as Block | undefined;
+    if (block?.type !== "paragraph" && block?.type !== "heading") throw new Error(`Can't split ${path}`);
+    const i = Number(index);
+    const next = insertBlock(setAt(page, path, before), list, i + 1, { type: "paragraph", text: after });
+    return { page: next, focus: { path: `${list}.${i + 1}.text`, caret: "start" } };
+  }
+
+  const item = path.match(ITEM_RE);
+  const items = item ? getAt(page, item[1]) : undefined;
+  if (!item || !Array.isArray(items) || !(item[1].endsWith(".items") || item[1] === "revision.points")) throw new Error(`Can't split ${path}`);
+  const [, listPath, index] = item;
+  const i = Number(index);
+  if (before === "" && after === "" && i === items.length - 1) {
+    const listBlock = listPath.match(/^(.*\.blocks)\.(\d+)\.items$/);
+    const owner = listBlock ? (getAt(page, `${listBlock[1]}.${listBlock[2]}`) as Block | undefined) : undefined;
+    const removed = removeEmptyItem(page, listPath, i);
+    if (listBlock && owner?.type === "list") {
+      // The list may have just disappeared (it only held this empty bullet).
+      const stillThere = items.length > 1;
+      const at = Number(listBlock[2]) + (stillThere ? 1 : 0);
+      return { page: insertBlock(removed, listBlock[1], at, { type: "paragraph", text: "" }), focus: { path: `${listBlock[1]}.${at}.text`, caret: "start" } };
+    }
+    return { page: removed };
+  }
+  const next = insertBlock(setAt(page, path, before), listPath, i + 1, after);
+  return { page: next, focus: { path: `${listPath}.${i + 1}`, caret: "start" } };
+}
+
+/** Removes item `i` from the list at `listPath`; a bullet list block left empty is removed too. */
+function removeEmptyItem(page: Page, listPath: string, i: number): Page {
+  const listBlock = listPath.match(/^(.*\.blocks\.\d+)\.items$/);
+  const items = getAt(page, listPath);
+  const owner = listBlock ? (getAt(page, listBlock[1]) as Block | undefined) : undefined;
+  if (owner?.type === "list" && Array.isArray(items) && items.length === 1) return removeItem(page, listBlock![1]);
+  return removeItem(page, `${listPath}.${i}`);
+}
+
+/** "- " typed at the start of the paragraph at `path` (`text` is the rest): the paragraph becomes
+ *  a bullet, joining a bullet list directly above it if there is one. */
+export function toBulletList(page: Page, path: string, text: string): { page: Page; focus: Focus } {
+  const match = path.match(BLOCK_TEXT_RE);
+  const block = match ? (getAt(page, `${match[1]}.${match[2]}`) as Block | undefined) : undefined;
+  if (!match || block?.type !== "paragraph") throw new Error(`Can't make a list from ${path}`);
+  const [, list, index] = match;
+  const i = Number(index);
+  const prev = i > 0 ? (getAt(page, `${list}.${i - 1}`) as Block | undefined) : undefined;
+  if (prev?.type === "list" && !prev.ordered) {
+    const joined = insertBlock(removeItem(page, `${list}.${i}`), `${list}.${i - 1}.items`, prev.items.length, text);
+    return { page: joined, focus: { path: `${list}.${i - 1}.items.${prev.items.length}`, caret: "start" } };
+  }
+  return { page: setAt(page, `${list}.${i}`, { type: "list", ordered: false, items: [text] }), focus: { path: `${list}.${i}.items.0`, caret: "start" } };
+}
+
+/** Backspace in an empty field at `path`: removes the empty bullet, revision point, paragraph,
+ *  heading or (when there's more than one) intro paragraph, and moves the caret to the end of
+ *  what came before. */
+export function removeEmpty(page: Page, path: string): { page: Page; focus?: Focus } {
+  const intro = path.match(/^intro\.(\d+)$/);
+  if (intro) {
+    const i = Number(intro[1]);
+    if (page.intro.length <= 1) return { page };
+    return { page: removeItem(page, path), focus: i > 0 ? { path: `intro.${i - 1}`, caret: "end" } : undefined };
+  }
+  const blockText = path.match(BLOCK_TEXT_RE);
+  if (blockText) {
+    const [, list, index] = blockText;
+    const i = Number(index);
+    const prev = i > 0 ? (getAt(page, `${list}.${i - 1}`) as Block | undefined) : undefined;
+    return { page: removeItem(page, `${list}.${i}`), focus: endOf(prev, `${list}.${i - 1}`) };
+  }
+  const item = path.match(ITEM_RE);
+  if (!item) throw new Error(`Can't remove ${path}`);
+  const [, listPath, index] = item;
+  const i = Number(index);
+  return { page: removeEmptyItem(page, listPath, i), focus: i > 0 ? { path: `${listPath}.${i - 1}`, caret: "end" } : undefined };
+}

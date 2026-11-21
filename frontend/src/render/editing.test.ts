@@ -56,8 +56,15 @@ describe("htmlToMarkdown", () => {
     expect(htmlToMarkdown(el("<div>Depression</div><div>Anxiety</div>"))).toBe("Depression\n\nAnxiety");
   });
 
-  it("converts <br> to a single space", () => {
-    expect(htmlToMarkdown(el("Line one<br>Line two"))).toBe("Line one Line two");
+  it("converts <br> to a line break", () => {
+    expect(htmlToMarkdown(el("Line one<br>Line two"))).toBe("Line one\nLine two");
+    expect(htmlToMarkdown(el(" Line one <br> Line two "))).toBe("Line one\nLine two");
+  });
+
+  it("keeps at most one line break in a row and drops trailing ones", () => {
+    expect(htmlToMarkdown(el("a<br><br><br>b"))).toBe("a\nb");
+    expect(htmlToMarkdown(el("a<br>"))).toBe("a");
+    expect(htmlToMarkdown(el("<br>a"))).toBe("a");
   });
 
   it("drops stray/unsupported tags but keeps their text", () => {

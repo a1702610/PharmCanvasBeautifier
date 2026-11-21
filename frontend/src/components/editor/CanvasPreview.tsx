@@ -5,6 +5,7 @@ import {
   useRef,
   type ClipboardEvent,
   type DragEvent,
+  type FormEvent,
   type FocusEvent,
   type KeyboardEvent,
   type MouseEvent,
@@ -18,7 +19,19 @@ import { sanitizePreviewHtml } from "../../render/sanitize";
 export type PreviewAction =
   | { kind: "add" | "add-panel" | "add-item"; list: string; index: number; anchor: DOMRect }
   | { kind: "delete" | "add-column"; path: string }
-  | { kind: "delete-column"; path: string; index: number };
+  | { kind: "delete-column"; path: string; index: number }
+  // Typing (see the data-enter / data-autolist markers in templates.ts):
+  | { kind: "split"; path: string; before: string; after: string }
+  | { kind: "to-list"; path: string; text: string }
+  | { kind: "remove-empty"; path: string };
+
+/** Ask the preview to put the caret in the field at `path` after the next render (e.g. the new
+ *  paragraph after Enter). `id` distinguishes repeated requests for the same path. */
+export interface FocusRequest {
+  path: string;
+  caret: "start" | "end";
+  id: number;
+}
 
 interface Props {
   html: string;
@@ -31,6 +44,7 @@ interface Props {
    *  focus time. */
   onEdit: (path: string, value: string) => boolean;
   onAction?: (action: PreviewAction) => void;
+  focusRequest?: FocusRequest | null;
 }
 
 /** Character offset of the caret within `container`'s text content, or 0 if there's no
@@ -75,11 +89,54 @@ function setCaretOffset(container: HTMLElement, offset: number) {
   sel.addRange(range);
 }
 
+/** The field's text before and after the caret, as inline markdown (formatting kept). */
+function splitAtCaret(field: HTMLElement): { before: string; after: string } {
+  const sel = window.getSelection();
+  const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+  if (!range || !field.contains(range.startContainer)) return { before: htmlToMarkdown(field), after: "" };
+  const toMarkdown = (part: Range) => {
+    const holder = document.createElement("div");
+    holder.appendChild(part.cloneContents());
+    return htmlToMarkdown(holder);
+  };
+  const head = document.createRange();
+  head.selectNodeContents(field);
+  head.setEnd(range.startContainer, range.startOffset);
+  const tail = document.createRange();
+  tail.selectNodeContents(field);
+  tail.setStart(range.endContainer, range.endOffset);
+  return { before: toMarkdown(head), after: toMarkdown(tail) };
+}
+
+/** Inserts a <br> at the caret (replacing any selection) and puts the caret after it. A break
+ *  at the very end gets a second, trailing <br> so the caret can sit on the new line; trailing
+ *  breaks are dropped when the text is saved. */
+function insertLineBreak(field: HTMLElement) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || !field.contains(sel.getRangeAt(0).startContainer)) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  const br = document.createElement("br");
+  range.insertNode(br);
+  const next = br.nextSibling;
+  if (!next || (next.nodeType === Node.TEXT_NODE && !next.textContent && !next.nextSibling)) br.after(document.createElement("br"));
+  const caret = document.createRange();
+  caret.setStartAfter(br);
+  caret.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(caret);
+}
+
+function markActiveTab(container: HTMLElement, activeIndex: number) {
+  const groups = container.querySelectorAll<HTMLElement>(".dp-tabs-buttons-vertical > .dp-panel-group");
+  groups.forEach((group, i) => group.classList.toggle("is-active", i === activeIndex));
+}
+
 function escapeAttrSelector(value: string): string {
   return value.replace(/["\\]/g, "\\$&");
 }
 
-export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit, onAction }: Props) {
+export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit, onAction, focusRequest }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const safe = useMemo(() => sanitizePreviewHtml(html), [html]);
   // The markdown value (and raw HTML) of the [data-edit] element that currently holds focus,
@@ -108,6 +165,7 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit, o
   // flag first; if no render comes, it simply expires.
   const skipRebuild = useRef(false);
   const skipExpiry = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handledFocusRequest = useRef<number | null>(null);
 
   useEffect(
     () => () => {
@@ -146,6 +204,8 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit, o
 
         const accs = container.querySelectorAll(".dp-accordion-default > .dp-panel-group");
         openIdx.forEach((i) => accs[i]?.classList.add("is-open"));
+        // Show the active tab before restoring focus: an element in a hidden tab can't take focus.
+        markActiveTab(container, activeIndex);
 
         if (focusedPath) {
           const restored = container.querySelector<HTMLElement>(`[data-edit="${escapeAttrSelector(focusedPath)}"]`);
@@ -160,13 +220,22 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit, o
     container.querySelectorAll<HTMLElement>("[data-edit]").forEach((el) => {
       el.contentEditable = editable ? "true" : "false";
     });
-  }, [safe, editable]);
+
+    if (editable && focusRequest && focusRequest.id !== handledFocusRequest.current) {
+      handledFocusRequest.current = focusRequest.id;
+      const target = container.querySelector<HTMLElement>(`[data-edit="${escapeAttrSelector(focusRequest.path)}"]`);
+      if (target) {
+        target.focus();
+        setCaretOffset(target, focusRequest.caret === "start" ? 0 : (target.textContent ?? "").length);
+      }
+    }
+    // activeIndex only matters for a rebuild (markActiveTab above); renderedSafe guards the rest.
+  }, [safe, editable, focusRequest, activeIndex]);
 
   // useLayoutEffect (not useEffect) so the active tab's panel is shown/hidden before the
   // browser paints, avoiding a flash of the wrong (or no) panel right after a save re-render.
   useLayoutEffect(() => {
-    const groups = ref.current?.querySelectorAll<HTMLElement>(".dp-tabs-buttons-vertical > .dp-panel-group") ?? [];
-    groups.forEach((group, i) => group.classList.toggle("is-active", i === activeIndex));
+    if (ref.current) markActiveTab(ref.current, activeIndex);
   }, [safe, activeIndex]);
 
   function handleClick(e: MouseEvent<HTMLDivElement>) {
@@ -239,9 +308,45 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit, o
     focusHtml.current = null;
   }
 
+  /** The field is about to be replaced by a structural change that already carries its text,
+   *  so the blur that follows mustn't save it again. */
+  function forgetFocusedValue() {
+    focusValue.current = null;
+    focusHtml.current = null;
+  }
+
   function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (!editable) return;
-    if (e.key === "Enter" && (e.target as HTMLElement).closest("[data-edit]")) e.preventDefault();
+    const field = (e.target as HTMLElement).closest<HTMLElement>("[data-edit]");
+    const path = field?.getAttribute("data-edit");
+    if (!field || !path) return;
+    const enter = field.dataset.enter;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (enter === "none") return;
+      if (enter === "split" && !e.shiftKey && onAction) {
+        const { before, after } = splitAtCaret(field);
+        forgetFocusedValue();
+        onAction({ kind: "split", path, before, after });
+        return;
+      }
+      insertLineBreak(field);
+      return;
+    }
+    if (e.key === "Backspace" && enter === "split" && onAction && htmlToMarkdown(field) === "") {
+      e.preventDefault();
+      forgetFocusedValue();
+      onAction({ kind: "remove-empty", path });
+    }
+  }
+
+  function handleInput(e: FormEvent<HTMLDivElement>) {
+    if (!editable || !onAction) return;
+    const field = (e.target as HTMLElement).closest<HTMLElement>("[data-autolist]");
+    const path = field?.getAttribute("data-edit");
+    if (!field || !path || !/^[-*\u2022][\s\u00a0]/.test(field.textContent ?? "")) return;
+    forgetFocusedValue();
+    onAction({ kind: "to-list", path, text: htmlToMarkdown(field).replace(/^[-*\u2022]\s*/, "") });
   }
 
   function insertPlainText(raw: string) {
@@ -274,6 +379,7 @@ export function CanvasPreview({ html, activeIndex, editable, onSelect, onEdit, o
       onFocus={handleFocus}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
+      onInput={handleInput}
       onPaste={handlePaste}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
