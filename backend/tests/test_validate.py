@@ -388,3 +388,30 @@ def test_unknown_units_in_coverage_are_ignored_and_sources_without_pages_need_no
         WireCoverage(source=3, unit=1, status="used"),
     ])
     assert not any("accounted for" in n.text or "left out" in n.text for n in page.notes)
+
+
+def test_unit_titles_skip_template_marks_page_numbers_and_repeated_footers():
+    footer = "Pharmacotherapeutics Theory 1"
+    deck = "=== SOURCE 1: deck.pdf ===\n\n" + "\n\n".join(
+        f"--- Page {n} ---\n+ {n}\n{footer}\n{title}\n{n}"
+        for n, title in [(1, "HYPERTENSION"), (2, "Cardiovascular Risk Factors"), (3, "Types of Hypertension"), (4, "+ Lifestyle Modification")]
+    )
+    units = SourceContext.from_text(deck).units
+    assert [units[(1, n)][2] for n in (1, 2, 3, 4)] == ["HYPERTENSION", "Cardiovascular Risk Factors", "Types of Hypertension", "Lifestyle Modification"]
+
+
+def test_coverage_notes_put_each_slide_on_its_own_line():
+    page = deck_page([WireCoverage(source=1, unit=1, status="omitted", reason="title slide")])
+    missing = next(n for n in page.notes if "not accounted for" in n.text)
+    lines = missing.text.split("\n")
+    assert lines[1:] == ["- deck.pdf page 2 (Cardiovascular Risk Factors)", "- deck.pdf page 3 (Types of Hypertension)", "- more.pptx slide 1 (Combination therapy)"]
+    left_out = next(n for n in page.notes if "left out" in n.text)
+    assert left_out.text.split("\n")[1] == "- deck.pdf page 1 (HYPERTENSION): title slide"
+
+
+def test_single_source_coverage_notes_leave_out_the_file_name():
+    ctx = SourceContext.from_text("=== SOURCE 1: deck.pdf ===\n\n--- Page 1 ---\nIntro\n\n--- Page 2 ---\nTables")
+    w = wire([tab("A", P, CLINICAL), tab("B", P, CLINICAL), tab("C", P, CLINICAL)])
+    w.coverage = [WireCoverage(source=1, unit=1, status="used")]
+    note = next(n for n in finalize_page(w, ctx, include_revision=False).notes if "not accounted for" in n.text)
+    assert note.text.split("\n")[1] == "- Page 2 (Tables)"

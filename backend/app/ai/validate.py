@@ -29,27 +29,47 @@ UNIT_MARKER_RE = re.compile(r"^--- (Slide|Page) (\d+) ---$", re.M)
 TITLE_MAX = 60
 
 
+def _norm_url(url: str) -> str:
+    return url.strip().rstrip("/.,;:")
+
+
+TEMPLATE_MARK_RE = re.compile(r"^[+\u2022*\-]\s*")
+SKIP_PREFIXES = ("[IMG-", "[EMBED-", "Links:", "|")
+
+
+def _clean_line(line: str) -> str:
+    """A slide line without the template's leading "+"/bullet mark."""
+    return TEMPLATE_MARK_RE.sub("", line.strip()).strip()
+
+
 def _source_units(text: str) -> dict[tuple[int, int], tuple[str, str, str]]:
     """Every "--- Slide n ---" / "--- Page n ---" in the source, keyed by (source, number),
-    with the source's file name, "Slide"/"Page" and the unit's first line of text as a title."""
+    with the source's file name, "Slide"/"Page" and the unit's first real line of text as a
+    title (skipping template marks, bare page numbers and footers repeated on most slides)."""
     units: dict[tuple[int, int], tuple[str, str, str]] = {}
     headers = list(SOURCE_HEADER_RE.finditer(text))
     for i, header in enumerate(headers):
         end = headers[i + 1].start() if i + 1 < len(headers) else len(text)
         section = text[header.end():end]
         markers = list(UNIT_MARKER_RE.finditer(section))
-        for j, marker in enumerate(markers):
-            body_end = markers[j + 1].start() if j + 1 < len(markers) else len(section)
-            lines = [line.strip() for line in section[marker.end():body_end].splitlines()]
-            title = next((line for line in lines if line and not line.startswith(("[IMG-", "[EMBED-", "Links:", "|"))), "")
+        bodies = [
+            [_clean_line(line) for line in section[m.end():(markers[j + 1].start() if j + 1 < len(markers) else len(section))].splitlines()]
+            for j, m in enumerate(markers)
+        ]
+        counts: dict[str, int] = {}
+        for body in bodies:
+            for line in set(body):
+                counts[line] = counts.get(line, 0) + 1
+        repeated = {line for line, n in counts.items() if len(bodies) >= 4 and n > len(bodies) / 2}
+        for marker, body in zip(markers, bodies):
+            title = next(
+                (line for line in body if line and not line.isdigit() and line not in repeated and not line.startswith(SKIP_PREFIXES)),
+                "",
+            )
             if len(title) > TITLE_MAX:
                 title = title[: TITLE_MAX - 1].rstrip() + "…"
             units[(int(header.group(1)), int(marker.group(2)))] = (header.group(2), marker.group(1), title)
     return units
-
-
-def _norm_url(url: str) -> str:
-    return url.strip().rstrip("/.,;:")
 
 
 @dataclass
@@ -323,23 +343,26 @@ def _coverage_notes(coverage: list[WireCoverage], ctx: SourceContext) -> list[No
         elif item.status == "omitted" and (item.reason or "").strip():
             omitted[key] = item.reason.strip()
 
+    one_source = len({source for source, _ in ctx.units}) == 1
+
     def label(key: tuple[int, int]) -> str:
         name, kind, title = ctx.units[key]
-        return f"{name} {kind.lower()} {key[1]}" + (f" ({title})" if title else "")
+        where = f"{kind} {key[1]}" if one_source else f"{name} {kind.lower()} {key[1]}"
+        return where + (f" ({title})" if title else "")
 
     notes: list[Note] = []
     missing = [k for k in sorted(ctx.units) if k not in used and k not in omitted]
     if missing:
         notes.append(Note(
             kind="unplaced",
-            text="Slides/pages not accounted for by the AI. Check their content made it onto the page: "
-            + "; ".join(label(k) for k in missing),
+            text="Slides/pages not accounted for by the AI. Check their content made it onto the page:\n"
+            + "\n".join(f"- {label(k)}" for k in missing),
         ))
     left_out = [(k, r) for k, r in sorted(omitted.items()) if k not in used]
     if left_out:
         notes.append(Note(
             kind="unplaced",
-            text="Slides/pages the AI left out: " + "; ".join(f"{label(k)}: {r}" for k, r in left_out),
+            text="Slides/pages the AI left out:\n" + "\n".join(f"- {label(k)}: {r}" for k, r in left_out),
         ))
     return notes
 

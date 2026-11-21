@@ -18,14 +18,26 @@ export function NotesPanel({ notes }: { notes: Note[] }) {
         <p className="mt-3 font-serif text-sm text-ink-muted">No issues found.</p>
       ) : (
         <ul className="mt-3 space-y-3">
-          {notes.map((note, i) => (
-            <li key={i} className="font-serif text-sm leading-snug">
-              <span className={`mr-2 rounded-md px-1.5 py-0.5 font-sans text-[11px] font-semibold ${LABEL[note.kind].className}`}>
-                {LABEL[note.kind].text}
-              </span>
-              {note.text}
-            </li>
-          ))}
+          {notes.map((note, i) => {
+            // A note can be a heading line followed by "- item" lines (e.g. slides left out).
+            const [first, ...rest] = note.text.split("\n");
+            const items = rest.map((line) => line.replace(/^\s*-\s*/, "").trim()).filter(Boolean);
+            return (
+              <li key={i} className="font-serif text-sm leading-snug">
+                <span className={`mr-2 rounded-md px-1.5 py-0.5 font-sans text-[11px] font-semibold ${LABEL[note.kind].className}`}>
+                  {LABEL[note.kind].text}
+                </span>
+                {first}
+                {items.length > 0 && (
+                  <ul className="mt-1.5 list-disc space-y-1 pl-5">
+                    {items.map((item, j) => (
+                      <li key={j}>{item}</li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
