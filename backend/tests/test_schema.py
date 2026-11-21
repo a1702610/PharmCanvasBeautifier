@@ -124,8 +124,7 @@ def test_wire_page_accepts_accordion_flow_formula_and_page_fields():
         "title": "T", "intro": ["i"],
         "intro_figure": {"ref": "IMG-01", "alt": "Map"},
         "study_activities": [{"task": "Watch part 1", "purpose": "Framework"}],
-        "revision": {"include": False, "points": ["A", "B"], "flow_title": "Direction",
-                     "flow": {"steps": [{"label": "CL"}, {"label": "k", "style": "amber"}]}},
+        "revision": {"include": False, "points": ["A", "B"]},
         "tabs": [{"title": "One", "blocks": [
             {"type": "key_point", "lead": "Distribution is reversible.", "text": "Drug moves back."},
             {"type": "flow", "steps": [{"label": "Dose", "style": "solid"}, {"label": "Effect", "sub": "PD"}]},
@@ -137,7 +136,7 @@ def test_wire_page_accepts_accordion_flow_formula_and_page_fields():
         ]}],
     })
     assert wire.tabs[0].blocks[4].panels[0].blocks[0].text == "Step 1"
-    assert wire.revision.flow.steps[1].style == "amber"
+    assert wire.revision.points == ["A", "B"]
     assert wire.intro_figure.ref == "IMG-01"
 
 

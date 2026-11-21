@@ -267,13 +267,10 @@ def finalize_page(wire: WirePage, ctx: SourceContext, include_revision: bool) ->
         if task and purpose:
             activities.append(StudyActivity(task=task, purpose=purpose))
     points = f.texts(wire.revision.points)[:8]
-    rev_flow = f.flow(wire.revision.flow.steps) if wire.revision.flow else None
     revision = Revision(
         include=include_revision or wire.revision.include or embed_ref is not None,
         embed_ref=embed_ref,
         points=points or None,
-        flow_title=f.text(wire.revision.flow_title) or None,
-        flow=rev_flow,
     )
     ai_notes = [Note(kind=n.kind, text=n.text.strip()) for n in wire.notes if n.text.strip()]
     return Page(

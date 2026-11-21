@@ -29,7 +29,7 @@ You do not write HTML. You return JSON matching the provided schema. The app tur
 - `intro`: 2–3 short paragraphs saying what the page covers and why it matters.
 - `intro_figure` (optional): an image id from the source that orients the topic (e.g. a course map); otherwise leave it null.
 - `tabs`: 3–8 teaching tabs, one per major concept, in teaching order. Titles 2–6 words, sentence case, **not numbered** (the app numbers them). Do not create a "Study materials" tab — the app adds it.
-- `revision.points`: 4–6 statements a student should be able to explain (not just recall), using only facts on the page. `revision.flow_title` and `revision.flow` (optional): one key relationship shown as a short flow (e.g. "Keep the direction of these relationships clear").
+- `revision.points`: 4–6 statements a student should be able to explain (not just recall), using only facts on the page.
 - `revision.include`: true only if the request asks for it or the source contains a quiz/H5P embed; set `revision.embed_ref` to an `[EMBED-nn]` id when one exists.
 - `study_activities` (optional): rows of `task` / `purpose` ONLY when the source describes activities (e.g. watching recordings, a tutorial). Never invent tasks or assessment requirements.
 

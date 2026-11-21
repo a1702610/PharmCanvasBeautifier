@@ -2,7 +2,7 @@ import type { EmbedInfo, ImageInfo } from "../types/api";
 import type { Page, Tab } from "../types/page";
 import { escapeAttr, renderInline } from "./inline";
 import { studyMaterialsContentLines } from "./studyMaterials";
-import { contentLines, figureLines, flowRowLines, indent, PALETTE as P, PLACEHOLDER_STYLE, SPACER, type RenderContext } from "./templates";
+import { contentLines, figureLines, indent, PALETTE as P, PLACEHOLDER_STYLE, SPACER, type RenderContext } from "./templates";
 
 export const TABS_CLASS = "dp-panels-wrapper dp-tabs-buttons-vertical";
 
@@ -62,16 +62,6 @@ function revisionLines(page: Page, ctx: RenderContext): string[] {
         `<td${edit(ctx, `revision.points.${i}`)} style="padding: 12px; border: 1px solid ${P.border};">${renderInline(pt)}</td>`,
       ]), "</tr>"])), "</tbody>"]),
       "</table>",
-    );
-  }
-  if (rev.flow && rev.flow.steps.length >= 2) {
-    inner.push(
-      `<div style="margin: 20px 0px 0px; padding: 16px; background: #ffffff; border-radius: 8px; border: 1px solid ${P.border};">`,
-      ...indent([
-        ...(rev.flow_title ? [`<p style="margin: 0 0 10px 0;"><strong${edit(ctx, "revision.flow_title")}>${renderInline(rev.flow_title)}</strong></p>`] : []),
-        ...flowRowLines(rev.flow, ctx, "revision.flow"),
-      ]),
-      "</div>",
     );
   }
   if (rev.include || embed) {

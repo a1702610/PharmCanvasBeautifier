@@ -112,8 +112,6 @@ describe("parseImportedPage", () => {
         revision: {
           include: false,
           points: ["p"],
-          flow_title: "f",
-          flow: { type: "flow", steps: [{ label: "a", style: "solid" }, { label: "b", style: "outline" }] },
         },
         notes: [],
         intro_figure: { type: "figure", ref: "IMG-01", alt: "x" },

@@ -82,6 +82,6 @@ export interface Page {
   intro_figure?: FigureBlock;
   study_activities?: { task: string; purpose: string }[];
   study?: StudyMaterials;
-  revision: { include: boolean; embed_ref?: string; points?: string[]; flow_title?: string; flow?: FlowBlock };
+  revision: { include: boolean; embed_ref?: string; points?: string[] };
   notes: Note[];
 }

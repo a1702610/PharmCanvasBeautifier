@@ -66,7 +66,7 @@ Tab markup:
 
 Within each tab use sub-headings (4.2) to break up sections. Every tab must contain **at least one** "Why this matters clinically" callout and must **end with a "Check your understanding" block** (4.8). Do not generate per-tab "Key takeaways".
 
-**Revision check.** Write 4–6 statements a student should be able to explain (not just recall), using only facts on the page. Optionally add one flow (4.6, inner row only) showing a key relationship. Include the H5P slot only when the source contains a quiz or H5P embed (keep the embed unchanged) or the lecturer asks for it; otherwise leave the placeholder text.
+**Revision check.** Write 4–6 statements a student should be able to explain (not just recall), using only facts on the page. Include the H5P slot only when the source contains a quiz or H5P embed (keep the embed unchanged) or the lecturer asks for it; otherwise leave the placeholder text.
 
 **Study materials tab.** This is always the last tab. Because there is no app here, you fill it in yourself, using only links and details in the source. Never invent a link. Where a link is missing, leave the bracketed placeholder text exactly as shown. Order inside the tab:
 
@@ -382,16 +382,7 @@ This is the only place `&nbsp;` is used apart from between a number and its unit
 
 Add one row per point, numbered 1, 2, 3…
 
-Optional flow box (after the table, inside the same outer div) for one key relationship, using the flex row from 4.6 without its outer margin div:
-
-```html
-<div style="margin: 20px 0px 0px; padding: 16px; background: #ffffff; border-radius: 8px; border: 1px solid #cbd5e1;">
-    <p style="margin: 0 0 10px 0;"><strong>FLOW TITLE</strong></p>
-    FLOW (4.6 inner flex row only)
-</div>
-```
-
-Optional H5P slot (after the table and flow box), only when the source has a quiz or H5P embed or the lecturer asks for it. Keep an `<iframe>` embed from the source unchanged; otherwise leave the placeholder text:
+Optional H5P slot (after the table), only when the source has a quiz or H5P embed or the lecturer asks for it. Keep an `<iframe>` embed from the source unchanged; otherwise leave the placeholder text:
 
 ```html
 <div style="margin: 20px 0px 0px; padding: 16px; background: #ffffff; border-radius: 8px; border: 2px dashed #ddd8ef; text-align: center;">

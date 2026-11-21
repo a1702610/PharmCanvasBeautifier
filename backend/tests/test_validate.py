@@ -301,16 +301,14 @@ def test_tab_title_number_prefix_stripped():
 
 def test_page_fields_revision_points_flow_activities_intro_figure():
     w = wire([tab("A", P, CLIN), tab("B", P, CLIN), tab("C", P, CLIN)])
-    from app.ai.schema import WireFigureRef, WireActivity, WireRevision, WireFlow, WireFlowStep
+    from app.ai.schema import WireFigureRef, WireActivity, WireRevision
     w.intro_figure = WireFigureRef(ref="IMG-01", alt="Course map")
     w.study_activities = [WireActivity(task="Watch part 1", purpose="Framework"), WireActivity(task="", purpose="x")]
-    w.revision = WireRevision(points=["One", " ", "Two"] + [f"P{i}" for i in range(10)], flow_title="Direction",
-                              flow=WireFlow(steps=[WireFlowStep(label="CL"), WireFlowStep(label="k", style="amber")]))
+    w.revision = WireRevision(points=["One", " ", "Two"] + [f"P{i}" for i in range(10)])
     page = finalize_page(w, CTX, include_revision=False)
     assert page.intro_figure.ref == "IMG-01" and page.intro_figure.alt == "Course map"
     assert [(a.task, a.purpose) for a in page.study_activities] == [("Watch part 1", "Framework")]
     assert page.revision.points[:2] == ["One", "Two"] and len(page.revision.points) == 8
-    assert page.revision.flow_title == "Direction" and [s.label for s in page.revision.flow.steps] == ["CL", "k"]
 
 
 def test_unknown_intro_figure_dropped_silently():

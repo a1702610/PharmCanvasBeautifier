@@ -9,7 +9,7 @@ const page: Page = {
     { id: "t1", title: "Overview", blocks: [{ type: "paragraph", text: "Body." }] },
     { id: "t2", title: "Management", blocks: [{ type: "takeaways", items: ["Legacy"] }] },
   ],
-  revision: { include: false, points: ["Explain A.", "Explain B."], flow_title: "Direction", flow: { type: "flow", steps: [{ label: "CL", style: "solid" }, { label: "k", style: "amber" }] } },
+  revision: { include: false, points: ["Explain A.", "Explain B."] },
   notes: [],
 };
 const ctx = buildContext([], [{ ref: "EMBED-01", html: '<iframe src="https://h5p/1"></iframe>' }]);
@@ -32,12 +32,17 @@ describe("renderPage", () => {
     expect(html.indexOf("</table>")).toBeLessThan(html.indexOf("    <p>&nbsp;</p>\n    <div class=\"dp-panels-wrapper"));
   });
 
-  it("revision check with points and flow", () => {
+  it("revision check with points, no flow diagram", () => {
     const html = renderPage(page, ctx);
     expect(html).toContain('<h2 style="margin: 0 0 8px 0; color: #140f50;">Revision check</h2>');
     expect(html).toContain('<td style="width: 44px; padding: 12px; text-align: center; color: #d97706; border: 1px solid #cbd5e1;">1</td>');
-    expect(html).toContain("<strong>Direction</strong>");
+    expect(html).not.toContain("&rarr;");
     expect(html).not.toContain("[PASTE H5P EMBED HERE]");
+    // Pages saved before the diagram was removed may still carry revision.flow: it is ignored.
+    const legacy = { ...page, revision: { ...page.revision, flow_title: "Direction", flow: { type: "flow", steps: [{ label: "CL", style: "solid" }, { label: "k", style: "amber" }] } } } as Page;
+    const legacyHtml = renderPage(legacy, ctx);
+    expect(legacyHtml).not.toContain("Direction");
+    expect(legacyHtml).not.toContain("&rarr;");
     expect(html.trimEnd().endsWith("</div>")).toBe(true);
   });
 

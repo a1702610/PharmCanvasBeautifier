@@ -55,10 +55,6 @@ class WireFlowStep(BaseModel):
     style: FlowStyle | None = None
 
 
-class WireFlow(BaseModel):
-    steps: list[WireFlowStep] | None = None
-
-
 class WireBlockBase(BaseModel):
     type: BlockType
     text: str | None = None
@@ -109,8 +105,6 @@ class WireRevision(BaseModel):
     include: bool = False
     embed_ref: str | None = None
     points: list[str] | None = None
-    flow_title: str | None = None
-    flow: WireFlow | None = None
 
 
 class WireActivity(BaseModel):
@@ -310,8 +304,6 @@ class Revision(BaseModel):
     include: bool = False
     embed_ref: str | None = None
     points: list[str] | None = None
-    flow_title: str | None = None
-    flow: Flow | None = None
 
 
 class StudyActivity(BaseModel):

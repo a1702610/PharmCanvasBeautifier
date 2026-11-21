@@ -65,8 +65,6 @@ const contractPage: Page = {
   revision: {
     include: false,
     points: ["P1"],
-    flow_title: "Dir",
-    flow: { type: "flow", steps: [{ label: "a", style: "solid" }, { label: "b", style: "amber" }] },
   },
   notes: [],
 };
@@ -105,8 +103,6 @@ describe("data-edit path contract", () => {
       "study_activities.0.task",
       "study_activities.0.purpose",
       "revision.points.0",
-      "revision.flow_title",
-      "revision.flow.steps.1.label",
       "intro_figure.caption",
     ]) expect(paths).toContain(p);
   });
